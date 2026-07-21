@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>法會人數回報</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --navy: #2d4a6e; --navy-light: #e8f0fb;
+  --bg: #f0ede8; --card: #fff; --muted: #666;
+  --danger: #c62828; --success: #2e7d32; --radius: 12px;
+}
+body { font-family: -apple-system,'PingFang TC','Noto Sans TC',sans-serif; background:var(--bg); color:#1a1a1a; min-height:100vh; }
+header { background:var(--navy); color:white; padding:14px 20px; text-align:center; position:sticky; top:0; z-index:10; }
+header h1 { font-size:17px; font-weight:600; }
+header p  { font-size:13px; opacity:.75; margin-top:2px; }
+.container { padding:14px; max-width:480px; margin:0 auto; }
+.card { background:var(--card); border-radius:var(--radius); padding:16px; margin-bottom:12px; box-shadow:0 1px 4px rgba(0,0,0,.08); }
+.card-label { font-size:11px; color:var(--muted); letter-spacing:.8px; text-transform:uppercase; margin-bottom:4px; }
+.card-value { font-size:19px; font-weight:700; color:var(--navy); }
+.login-wrap { padding:32px 16px; max-width:360px; margin:0 auto; }
+.login-logo { text-align:center; margin-bottom:28px; }
+.login-logo .icon { font-size:48px; }
+.login-logo h2 { font-size:20px; font-weight:700; color:var(--navy); margin-top:8px; }
+.field { margin-bottom:14px; }
+.field label { display:block; font-size:13px; color:var(--muted); margin-bottom:5px; }
+.field input { width:100%; padding:13px 14px; font-size:16px; border:2px solid #e0e0e0; border-radius:8px; background:white; }
+.field input:focus { border-color:var(--navy); outline:none; }
+.btn { width:100%; padding:15px; font-size:17px; font-weight:600; background:var(--navy); color:white; border:none; border-radius:var(--radius); cursor:pointer; }
+.btn:disabled { opacity:.6; }
+.btn-outline { background:white; color:var(--navy); border:2px solid var(--navy); margin-top:10px; }
+.grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin:12px 0; }
+.inp-group label { display:block; font-size:13px; color:var(--muted); margin-bottom:4px; text-align:center; }
+.inp-group input[type="number"] { width:100%; padding:12px 4px; font-size:24px; font-weight:700; border:2px solid #e0e0e0; border-radius:8px; text-align:center; color:var(--navy); background:white; }
+.inp-group input[type="number"]:focus { border-color:var(--navy); outline:none; }
+.inp-group input[type="text"] { width:100%; padding:11px 12px; font-size:15px; border:2px solid #e0e0e0; border-radius:8px; }
+.total-row { display:flex; justify-content:space-between; align-items:center; border-top:1px solid #eee; padding-top:12px; margin-top:4px; }
+.total-row span:first-child { font-size:15px; color:var(--muted); }
+.total-num { font-size:28px; font-weight:800; color:var(--navy); }
+.prev-tag { display:inline-block; background:#fff3e0; color:#bf6000; font-size:12px; font-weight:600; padding:3px 9px; border-radius:20px; margin-bottom:8px; }
+.mini-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:6px; margin:8px 0; }
+.mini-item { text-align:center; }
+.mini-item .n { font-size:20px; font-weight:700; color:var(--navy); }
+.mini-item .l { font-size:11px; color:var(--muted); }
+.success-wrap { text-align:center; padding:36px 20px; }
+.check-circle { width:72px; height:72px; border-radius:50%; background:var(--success); color:white; font-size:36px; display:flex; align-items:center; justify-content:center; margin:0 auto 16px; }
+.success-title { font-size:22px; font-weight:700; color:var(--success); margin-bottom:6px; }
+.success-sub { font-size:13px; color:var(--muted); margin-bottom:20px; }
+.screen { display:none; }
+.screen.active { display:block; }
+.error-msg { color:var(--danger); font-size:14px; margin-top:8px; text-align:center; min-height:20px; }
+.loading-msg { text-align:center; padding:48px; color:var(--muted); font-size:15px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>中台禪寺</h1>
+  <p id="header-sub">法會人數回報系統</p>
+</header>
+
+<div id="screen-login" class="screen active">
+  <div class="login-wrap">
+    <div class="login-logo">
+      <div class="icon">🏯</div>
+      <h2>精舍登入</h2>
+    </div>
+    <div class="field">
+      <label>精舍帳號</label>
+      <input id="inp-account" type="text" placeholder="例：普高" autocomplete="username">
+    </div>
+    <div class="field">
+      <label>密碼</label>
+      <input id="inp-password" type="password" autocomplete="current-password"
+             onkeydown="if(event.key==='Enter') doLogin()">
+    </div>
+    <button class="btn" id="btn-login" onclick="doLogin()">登入</button>
+    <div id="login-error" class="error-msg"></div>
+  </div>
+</div>
+
+<div id="screen-loading" class="screen">
+  <div class="loading-msg">載入中…</div>
+</div>
+
+<div id="screen-main" class="screen">
+  <div class="container">
+    <div class="card">
+      <div class="card-label">目前活動</div>
+      <div class="card-value" id="activity-name">—</div>
+    </div>
+    <div class="card" style="background:var(--navy-light);">
+      <div class="card-label">休息區位置</div>
+      <div class="card-value" id="rest-area" style="font-size:22px;line-height:1.35;">—</div>
+    </div>
+    <div class="card" id="est-card" style="display:none;">
+      <span class="prev-tag" style="background:#e8f0fb;color:#2d4a6e;">本場報名人數</span>
+      <div class="mini-grid" id="est-mini"></div>
+    </div>
+    <div class="card" id="prev-card" style="display:none;">
+      <span class="prev-tag">已有回報紀錄</span>
+      <div style="font-size:13px;color:var(--muted);" id="prev-time-text"></div>
+      <div class="mini-grid" id="prev-mini"></div>
+      <div style="font-size:12px;color:var(--muted);">送出後將更新為最新數字</div>
+    </div>
+    <div class="card">
+      <div style="font-size:15px;font-weight:600;margin-bottom:4px;">回報人數</div>
+      <div class="inp-group" style="margin:12px 0;">
+        <label style="font-size:13px;color:var(--muted);display:block;margin-bottom:4px;text-align:center;">信眾</label>
+        <input type="number" id="f-lay" min="0" value="0" oninput="calcTotal()">
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin:0 0 10px;">
+        <div class="inp-group"><label>法師</label><input type="number" id="f-monk" min="0" value="0" oninput="calcTotal()"></div>
+        <div class="inp-group"><label>義工</label><input type="number" id="f-volunteer" min="0" value="0" oninput="calcTotal()"></div>
+        <div class="inp-group"><label>便當數</label><input type="number" id="f-driver" min="0" value="0" oninput="calcTotal()"></div>
+      </div>
+      <div class="inp-group" style="margin-bottom:10px;">
+        <label style="font-size:13px;color:var(--muted);display:block;margin-bottom:4px;">備註（選填）</label>
+        <input type="text" id="f-note" placeholder="">
+      </div>
+      <div class="total-row">
+        <span>合計人數</span>
+        <span class="total-num" id="total-num">0</span>
+      </div>
+      <button class="btn" id="btn-submit" onclick="doSubmit()" style="margin-top:14px;">送出回報</button>
+    </div>
+  </div>
+</div>
+
+<div id="screen-success" class="screen">
+  <div class="container">
+    <div class="card success-wrap">
+      <div class="check-circle">✓</div>
+      <div class="success-title">回報成功</div>
+      <div class="success-sub" id="success-time"></div>
+      <div class="mini-grid" id="success-mini"></div>
+      <button class="btn btn-outline" onclick="goToMain()">重新回報</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── 填入你的 Supabase 設定 ──────────────────────────────────
+const SUPABASE_URL = 'https://dfqcbwresfwejiudlqso.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_NnGcMxbnG_D_3qDeFahMqQ_MjSsPzHQ';
+// ────────────────────────────────────────────────────────────
+
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+const S  = { 精舍編號: null, 精舍名稱: null, 活動ID: null };
+
+function show(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+async function doLogin() {
+  const account  = document.getElementById('inp-account').value.trim();
+  const password = document.getElementById('inp-password').value.trim();
+  if (!account || !password) { setErr('請輸入帳號和密碼'); return; }
+  setBtn('btn-login', true, '登入中…');
+
+  const { data, error } = await sb.from('temples')
+    .select('number, name')
+    .eq('account', account)
+    .eq('password', password);
+
+  setBtn('btn-login', false, '登入');
+  if (error || !data?.length) { setErr('帳號或密碼錯誤'); return; }
+
+  S.精舍編號 = data[0].number;
+  S.精舍名稱 = data[0].name;
+  document.getElementById('header-sub').textContent = data[0].name;
+  show('screen-loading');
+  loadPageData();
+}
+
+function setErr(msg) { document.getElementById('login-error').textContent = msg; }
+
+async function loadPageData() {
+  // 取得進行中活動
+  const { data: events } = await sb.from('events')
+    .select('id, name, date')
+    .eq('status', '進行中')
+    .limit(1);
+
+  if (!events?.length) {
+    alert('目前沒有進行中的活動');
+    show('screen-login');
+    return;
+  }
+  const ev = events[0];
+  S.活動ID = ev.id;
+  document.getElementById('activity-name').textContent = ev.name;
+
+  // 平行取得休息區 + 預估人數 + 舊回報
+  const [restRes, estRes, repRes] = await Promise.all([
+    sb.from('rest_areas').select('description')
+      .eq('event_id', ev.id).eq('temple_number', S.精舍編號).maybeSingle(),
+    sb.from('estimates').select('vip,lay,monk,driver')
+      .eq('event_id', ev.id).eq('temple_number', S.精舍編號).maybeSingle(),
+    sb.from('reports').select('*')
+      .eq('event_id', ev.id).eq('temple_number', S.精舍編號).maybeSingle()
+  ]);
+
+  document.getElementById('rest-area').textContent =
+    restRes.data?.description || '（尚未分配）';
+
+  const est = estRes.data;
+  if (est) {
+    document.getElementById('est-card').style.display = 'block';
+    document.getElementById('est-mini').innerHTML = miniGrid((est.vip||0)+(est.lay||0), est.monk, est.volunteer||0, est.driver);
+  }
+
+  const prev = repRes.data;
+  if (prev) {
+    const timeStr = new Date(prev.reported_at)
+      .toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' });
+    document.getElementById('prev-card').style.display = 'block';
+    document.getElementById('prev-time-text').textContent = '回報時間：' + timeStr;
+    document.getElementById('prev-mini').innerHTML = miniGrid((prev.vip||0)+prev.lay, prev.monk, prev.volunteer||0, prev.driver);
+    document.getElementById('f-lay').value       = (prev.vip||0) + prev.lay;
+    document.getElementById('f-monk').value      = prev.monk;
+    document.getElementById('f-volunteer').value = prev.volunteer || 0;
+    document.getElementById('f-driver').value    = prev.driver;
+    document.getElementById('f-note').value      = prev.note || '';
+    calcTotal();
+  }
+  show('screen-main');
+}
+
+function calcTotal() {
+  const t = ['f-lay','f-monk','f-volunteer','f-driver']
+    .reduce((acc, id) => acc + (parseInt(document.getElementById(id).value) || 0), 0);
+  document.getElementById('total-num').textContent = t;
+}
+
+async function doSubmit() {
+  const vip       = 0;
+  const lay       = parseInt(document.getElementById('f-lay').value)       || 0;
+  const monk      = parseInt(document.getElementById('f-monk').value)      || 0;
+  const volunteer = parseInt(document.getElementById('f-volunteer').value) || 0;
+  const driver    = parseInt(document.getElementById('f-driver').value)    || 0;
+  const note      = document.getElementById('f-note').value;
+
+  if ((lay + monk + volunteer + driver) === 0 && !confirm('總人數為 0，確定要送出嗎？')) return;
+
+  setBtn('btn-submit', true, '送出中…');
+
+  const { error } = await sb.from('reports').upsert({
+    event_id:      S.活動ID,
+    temple_number: S.精舍編號,
+    reported_at:   new Date().toISOString(),
+    vip, lay, monk, volunteer, driver,
+    note: note || ''
+  }, { onConflict: 'event_id,temple_number' });
+
+  setBtn('btn-submit', false, '送出回報');
+  if (error) { alert('送出失敗：' + error.message); return; }
+
+  const now = new Date().toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' });
+  document.getElementById('success-time').textContent = '回報時間：' + now;
+  document.getElementById('success-mini').innerHTML = miniGrid(lay, monk, volunteer, driver);
+  show('screen-success');
+}
+
+function goToMain() {
+  setBtn('btn-submit', false, '送出回報');
+  document.getElementById('prev-card').style.display = 'none';
+  show('screen-loading');
+  loadPageData();
+}
+
+function setBtn(id, disabled, text) {
+  const b = document.getElementById(id);
+  b.disabled = disabled; b.textContent = text;
+}
+
+function miniGrid(lay, monk, volunteer, driver) {
+  return ['信眾','法師','義工','便當'].map((l, i) =>
+    `<div class="mini-item"><div class="n">${[lay,monk,volunteer,driver][i]}</div><div class="l">${l}</div></div>`
+  ).join('');
+}
+</script>
+</body>
+</html>

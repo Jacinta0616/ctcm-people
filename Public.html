@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>法會人數統計 — 公開查看</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --navy: #2d4a6e; --navy-light: #e8f0fb;
+  --bg: #f4f6f9; --card: #fff; --muted: #666;
+  --border: #e0e0e0; --danger: #c62828;
+  --success: #2e7d32; --warn: #e65100; --radius: 10px;
+}
+body { font-family: -apple-system,'PingFang TC','Noto Sans TC',sans-serif; background:var(--bg); color:#1a1a1a; min-height:100vh; }
+header { background:var(--navy); color:white; padding:12px 20px; display:flex; align-items:center; justify-content:space-between; gap:12px; position:sticky; top:0; z-index:20; }
+.header-left { display:flex; flex-direction:column; }
+.btn-admin { padding:7px 14px; font-size:13px; font-weight:600; background:rgba(255,255,255,.18); color:white; border:1.5px solid rgba(255,255,255,.5); border-radius:7px; cursor:pointer; white-space:nowrap; text-decoration:none; display:inline-block; transition:background .15s; }
+.btn-admin:hover { background:rgba(255,255,255,.3); }
+header h1 { font-size:17px; font-weight:600; }
+header p  { font-size:12px; opacity:.7; }
+.container { max-width:1100px; margin:0 auto; padding:16px; }
+.btn { padding:9px 18px; font-size:14px; font-weight:600; border:none; border-radius:8px; cursor:pointer; }
+.btn-outline { background:white; color:var(--navy); border:2px solid var(--navy); }
+.btn-sm { padding:6px 13px; font-size:13px; }
+.control-bar { background:var(--card); border-radius:var(--radius); padding:12px 16px; margin-bottom:12px; display:flex; align-items:center; gap:10px; flex-wrap:wrap; box-shadow:0 1px 3px rgba(0,0,0,.07); }
+.control-bar label { font-size:14px; color:var(--muted); white-space:nowrap; }
+.control-bar select { padding:7px 12px; font-size:14px; border:2px solid var(--border); border-radius:8px; background:white; }
+.control-bar select:focus { border-color:var(--navy); outline:none; }
+.last-update { font-size:12px; color:var(--muted); margin-left:auto; }
+.tab-group { display:flex; gap:3px; background:var(--card); border-radius:9px; padding:4px; box-shadow:0 1px 3px rgba(0,0,0,.07); margin-bottom:14px; flex-wrap:wrap; }
+.tab-btn { padding:8px 16px; font-size:13px; font-weight:600; border:none; border-radius:7px; background:transparent; color:var(--muted); cursor:pointer; }
+.tab-btn.active { background:var(--navy); color:white; }
+.tab-btn:not(.active):hover { background:var(--navy-light); color:var(--navy); }
+.stat-row { display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); gap:10px; margin-bottom:14px; }
+.stat-card { background:var(--card); border-radius:var(--radius); padding:14px 16px; box-shadow:0 1px 3px rgba(0,0,0,.07); }
+.stat-card .num { font-size:28px; font-weight:800; color:var(--navy); }
+.stat-card .lbl { font-size:12px; color:var(--muted); margin-top:2px; }
+.stat-card.warn .num { color:var(--warn); }
+.table-wrap { background:var(--card); border-radius:var(--radius); overflow:auto; box-shadow:0 1px 3px rgba(0,0,0,.07); }
+table { width:100%; border-collapse:collapse; font-size:14px; }
+th { background:var(--navy); color:white; padding:10px 12px; text-align:left; white-space:nowrap; font-weight:600; }
+td { padding:8px 12px; border-bottom:1px solid var(--border); white-space:nowrap; vertical-align:middle; }
+tr:last-child td { border-bottom:none; }
+tr.unreported { background:#fff8f0; }
+tr.total-row td { background:#f0ede8; font-weight:700; border-top:2px solid var(--border); }
+.badge { display:inline-block; padding:3px 9px; border-radius:20px; font-size:12px; font-weight:600; }
+.badge-ok   { background:#e8f5e9; color:var(--success); }
+.badge-wait { background:#fff3e0; color:var(--warn); }
+.diff-pos { color:#1565c0; }
+.diff-neg { color:var(--danger); }
+.hall-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:12px; }
+.hall-card { background:var(--card); border-radius:var(--radius); padding:16px; box-shadow:0 1px 3px rgba(0,0,0,.07); }
+.hall-card.main-hall { border-left:4px solid var(--navy); }
+.hall-title { font-size:13px; font-weight:700; color:var(--navy); margin-bottom:8px; }
+.hall-count { font-size:32px; font-weight:800; color:var(--navy); margin-bottom:8px; }
+.hall-count span { font-size:14px; font-weight:400; color:var(--muted); }
+.detail-list { font-size:13px; color:var(--muted); border-top:1px solid var(--border); padding-top:8px; }
+.detail-row { display:flex; justify-content:space-between; padding:3px 0; }
+.tab-content { display:none; }
+.tab-content.active { display:block; }
+.empty-msg { text-align:center; padding:40px; color:var(--muted); font-size:14px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-left">
+    <h1>中台禪寺 — 法會人數統計</h1>
+    <p>公開查看（唯讀）</p>
+  </div>
+  <a class="btn-admin" href="Admin.html">後台管理 →</a>
+</header>
+
+<div class="container">
+
+  <div class="control-bar">
+    <label>活動：</label>
+    <select id="activity-select" onchange="onActivityChange()">
+      <option value="">— 載入中 —</option>
+    </select>
+    <button class="btn btn-outline btn-sm" onclick="refreshData()">↻ 重新整理</button>
+    <span class="last-update" id="last-update"></span>
+  </div>
+
+  <div class="tab-group">
+    <button class="tab-btn active" onclick="switchTab('comparison')">比較總覽</button>
+    <button class="tab-btn" onclick="switchTab('hall')">殿堂視角</button>
+    <button class="tab-btn" onclick="switchTab('temple')">精舍視角</button>
+    <button class="tab-btn" onclick="switchTab('meal')">齋供視角</button>
+  </div>
+
+  <div id="tab-comparison" class="tab-content active">
+    <div id="comp-stats" class="stat-row"></div>
+    <div class="table-wrap">
+      <table><thead><tr>
+        <th>精舍</th><th>報名</th><th>已回報</th><th>差異數</th><th>落差率</th><th>回報時間</th><th>狀態</th>
+      </tr></thead>
+      <tbody id="comp-body"><tr><td colspan="7" class="empty-msg">請先選擇活動</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div id="tab-hall" class="tab-content">
+    <div id="hall-content"><div class="empty-msg">請先選擇活動</div></div>
+  </div>
+
+  <div id="tab-temple" class="tab-content">
+    <div class="table-wrap">
+      <table><thead><tr>
+        <th>精舍</th><th>信眾</th><th>法師</th><th>義工</th><th>便當數</th><th>合計</th><th>回報時間</th>
+      </tr></thead>
+      <tbody id="temple-body"><tr><td colspan="7" class="empty-msg">請先選擇活動</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div id="tab-meal" class="tab-content">
+    <div id="meal-content"><div class="empty-msg">請先選擇活動</div></div>
+  </div>
+
+</div>
+
+<script>
+// ── 填入你的 Supabase 設定 ──────────────────────────────────
+const SUPABASE_URL = 'https://dfqcbwresfwejiudlqso.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_NnGcMxbnG_D_3qDeFahMqQ_MjSsPzHQ';
+// ────────────────────────────────────────────────────────────
+
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+let currentTab = 'comparison';
+let dashCache  = null;
+const ALL_TABS = ['comparison','hall','temple','meal'];
+
+async function init() {
+  const { data } = await sb.from('events').select('id,name,status').order('date', { ascending: false });
+  const sel = document.getElementById('activity-select');
+  sel.innerHTML = '<option value="">— 請選擇活動 —</option>';
+  (data || []).forEach(e => {
+    const opt = document.createElement('option');
+    opt.value = e.id;
+    opt.textContent = e.name + (e.status === '進行中' ? ' ✦' : '');
+    sel.appendChild(opt);
+  });
+  // 自動選進行中的活動
+  const active = (data || []).find(e => e.status === '進行中');
+  if (active) { sel.value = active.id; fetchDashboard(active.id); }
+}
+
+function onActivityChange() {
+  const id = document.getElementById('activity-select').value;
+  if (id) fetchDashboard(id);
+}
+
+function refreshData() {
+  const id = document.getElementById('activity-select').value;
+  if (id) fetchDashboard(id);
+}
+
+async function fetchDashboard(actId) {
+  dashCache = null;
+  document.getElementById('last-update').textContent = '載入中…';
+
+  const [templesRes, estRes, restRes, repRes] = await Promise.all([
+    sb.from('temples').select('*').order('number'),
+    sb.from('estimates').select('*').eq('event_id', actId),
+    sb.from('rest_areas').select('*').eq('event_id', actId),
+    sb.from('reports').select('*').eq('event_id', actId)
+  ]);
+
+  const temples = templesRes.data || [];
+  const estMap  = Object.fromEntries((estRes.data || []).map(r => [r.temple_number, r]));
+  const restMap = Object.fromEntries((restRes.data || []).map(r => [r.temple_number, r.description]));
+  const repMap  = Object.fromEntries((repRes.data || []).map(r => [r.temple_number, r]));
+
+  // 比較總覽
+  const compRows = temples.filter(t => estMap[t.number] !== undefined).map(t => {
+    const est = estMap[t.number];
+    const rep = repMap[t.number];
+    const estTotal = est ? est.vip+est.lay+est.monk+est.driver+(est.volunteer||0) : null;
+    const repTotal = rep ? rep.vip+rep.lay+rep.monk+rep.driver+(rep.volunteer||0) : null;
+    let 落差 = null, 落差率 = null;
+    if (estTotal !== null && repTotal !== null) {
+      落差 = repTotal - estTotal;
+      落差率 = estTotal > 0 ? ((落差/estTotal)*100).toFixed(1)+'%' : (落差===0?'0%':'—');
+    }
+    return { number: t.number, name: t.name, estTotal, repTotal, 落差, 落差率,
+             reported: !!rep, reportedAt: rep ? new Date(rep.reported_at).toLocaleString('zh-TW',{timeZone:'Asia/Taipei'}) : null };
+  });
+
+  // 殿堂視角
+  const hallMap = {};
+  let totalRepLayMonk = 0;
+  let totalSeatCount  = 0;
+  temples.forEach(t => {
+    const rep = repMap[t.number];
+    const est = estMap[t.number];
+    totalSeatCount += est?.seat_count || 0;
+    if (!rep) return;
+    const 信眾 = (rep.vip||0) + rep.lay;
+    totalRepLayMonk += 信眾 + rep.monk;
+    const hall = restMap[t.number] || '（未分配）';
+    if (!hallMap[hall]) hallMap[hall] = { count: 0, detail: [] };
+    hallMap[hall].count += 信眾 + rep.monk;
+    hallMap[hall].detail.push({ name: t.name, lay: 信眾, monk: rep.monk, sub: 信眾+rep.monk });
+  });
+  const mainCount = totalRepLayMonk - totalSeatCount;
+
+  // 精舍視角
+  const templeRows = temples.map(t => {
+    const rep = repMap[t.number];
+    if (!rep) return null;
+    const 信眾 = (rep.vip||0) + rep.lay;
+    const volunteer = rep.volunteer || 0;
+    return { name: t.name, 信眾, monk: rep.monk, volunteer, driver: rep.driver,
+             total: 信眾+rep.monk+rep.driver+volunteer,
+             reportedAt: new Date(rep.reported_at).toLocaleString('zh-TW',{timeZone:'Asia/Taipei'}) };
+  }).filter(Boolean);
+  const 總計 = templeRows.reduce(
+    (a, r) => ({ 信眾:a.信眾+r.信眾, monk:a.monk+r.monk, volunteer:a.volunteer+r.volunteer, driver:a.driver+r.driver, total:a.total+r.total }),
+    { 信眾:0, monk:0, volunteer:0, driver:0, total:0 }
+  );
+
+  // 齋供視角
+  const mealMap = {};
+  let mealTotal = 0;
+  temples.forEach(t => {
+    const rep = repMap[t.number];
+    if (!rep) return;
+    const hall = restMap[t.number] || '（未分配）';
+    if (!mealMap[hall]) mealMap[hall] = { count: 0, detail: [] };
+    mealMap[hall].count += rep.driver;
+    mealMap[hall].detail.push({ name: t.name, count: rep.driver });
+    mealTotal += rep.driver;
+  });
+
+  dashCache = { compRows, mainCount, totalSeatCount, hallMap, templeRows, 總計, mealMap, mealTotal,
+                未回報數: compRows.filter(r => !r.reported).length };
+  document.getElementById('last-update').textContent =
+    '更新：' + new Date().toLocaleTimeString('zh-TW',{timeZone:'Asia/Taipei'});
+  renderCurrentTab();
+}
+
+function switchTab(tab) {
+  currentTab = tab;
+  document.querySelectorAll('.tab-btn').forEach(b =>
+    b.classList.toggle('active', b.getAttribute('onclick').includes("'"+tab+"'"))
+  );
+  ALL_TABS.forEach(t => {
+    const el = document.getElementById('tab-'+t);
+    if (el) el.classList.toggle('active', t === tab);
+  });
+  renderCurrentTab();
+}
+
+function renderCurrentTab() {
+  if (!dashCache) return;
+  if (currentTab === 'comparison') renderComparison();
+  else if (currentTab === 'hall')   renderHall();
+  else if (currentTab === 'temple') renderTemple();
+  else if (currentTab === 'meal')   renderMeal();
+}
+
+function renderComparison() {
+  const c = dashCache;
+  const reported = c.compRows.filter(r => r.reported).length;
+  document.getElementById('comp-stats').innerHTML = [
+    { lbl:'精舍總數', num: c.compRows.length },
+    { lbl:'已回報',   num: reported },
+    { lbl:'未回報',   num: c.未回報數, warn: true },
+    { lbl:'目前實際', num: c.templeRows.reduce((s,r)=>s+r.total,0) }
+  ].map(s => `<div class="stat-card${s.warn?' warn':''}"><div class="num">${s.num}</div><div class="lbl">${s.lbl}</div></div>`).join('');
+
+  document.getElementById('comp-body').innerHTML = [...c.compRows]
+    .sort((a,b) => {
+      if (a.reported !== b.reported) return a.reported ? 1 : -1;
+      return a.number.localeCompare(b.number);
+    })
+    .map(r => {
+      const cls   = !r.reported ? ' class="unreported"' : '';
+      const badge = r.reported ? '<span class="badge badge-ok">已回報</span>' : '<span class="badge badge-wait">未回報</span>';
+      const diff    = r.落差===null ? '—' : (r.落差>0?'+'+r.落差:r.落差);
+      const diffCls = r.落差===null ? '' : (r.落差>=0?' class="diff-pos"':' class="diff-neg"');
+      return `<tr${cls}><td>${r.name}</td>
+        <td>${r.estTotal===null?'—':r.estTotal}</td>
+        <td>${r.repTotal===null?'—':r.repTotal}</td>
+        <td${diffCls}>${diff}</td>
+        <td>${r.落差率||'—'}</td>
+        <td>${r.reportedAt||'—'}</td>
+        <td>${badge}</td></tr>`;
+    }).join('') || '<tr><td colspan="7" class="empty-msg">尚無資料</td></tr>';
+}
+
+function renderHall() {
+  const c = dashCache;
+  let html = '<div class="hall-grid">';
+  html += `<div class="hall-card main-hall">
+    <div class="hall-title">🏛 主壇</div>
+    <div class="hall-count">${c.mainCount} <span>人</span></div>
+    <div class="detail-list">
+      <div class="detail-row"><span>全場信眾+法師</span><span>${c.mainCount + c.totalSeatCount} 人</span></div>
+      <div class="detail-row"><span>預設座位數（各休息區）</span><span>－${c.totalSeatCount} 席</span></div>
+    </div></div>`;
+  Object.entries(c.hallMap).forEach(([hall, v]) => {
+    html += `<div class="hall-card">
+      <div class="hall-title">📍 ${hall}</div>
+      <div class="hall-count">${v.count} <span>人（信眾+法師）</span></div>`;
+    if (v.detail.length) html += '<div class="detail-list">' +
+      v.detail.map(d => `<div class="detail-row"><span>${d.name}</span><span>眾 ${d.lay}＋師 ${d.monk} ＝ ${d.sub}</span></div>`).join('') + '</div>';
+    html += '</div>';
+  });
+  document.getElementById('hall-content').innerHTML = html + '</div>';
+}
+
+function renderTemple() {
+  const t = dashCache.總計;
+  document.getElementById('temple-body').innerHTML =
+    dashCache.templeRows.map(r =>
+      `<tr><td>${r.name}</td><td>${r.信眾}</td><td>${r.monk}</td><td>${r.volunteer}</td><td>${r.driver}</td><td><strong>${r.total}</strong></td><td>${r.reportedAt}</td></tr>`
+    ).join('') +
+    `<tr class="total-row"><td>合計</td><td>${t.信眾}</td><td>${t.monk}</td><td>${t.volunteer}</td><td>${t.driver}</td><td>${t.total}</td><td></td></tr>`
+    || '<tr><td colspan="7" class="empty-msg">尚無回報資料</td></tr>';
+}
+
+function renderMeal() {
+  const c = dashCache;
+  const entries = Object.entries(c.mealMap);
+  if (!entries.length) {
+    document.getElementById('meal-content').innerHTML = '<div class="empty-msg">尚無回報資料</div>';
+    return;
+  }
+  let html = '<div class="hall-grid">';
+  entries.forEach(([hall, v]) => {
+    html += `<div class="hall-card">
+      <div class="hall-title">🍱 ${hall}</div>
+      <div class="hall-count">${v.count} <span>份</span></div>`;
+    if (v.detail.length) html += '<div class="detail-list">' +
+      v.detail.map(d => `<div class="detail-row"><span>${d.name}</span><span>${d.count} 份</span></div>`).join('') + '</div>';
+    html += '</div>';
+  });
+  html += `<div class="hall-card" style="background:#f0ede8;">
+    <div class="hall-title">📊 便當總計</div>
+    <div class="hall-count">${c.mealTotal} <span>份</span></div>
+  </div>`;
+  document.getElementById('meal-content').innerHTML = html + '</div>';
+}
+
+init();
+</script>
+</body>
+</html>

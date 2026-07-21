@@ -1,0 +1,1259 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>後台管理 — 法會人數統計</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --navy: #2d4a6e; --navy-light: #e8f0fb;
+  --bg: #f4f6f9; --card: #fff; --muted: #666;
+  --border: #e0e0e0; --danger: #c62828;
+  --success: #2e7d32; --warn: #e65100; --radius: 10px;
+}
+body { font-family: -apple-system,'PingFang TC','Noto Sans TC',sans-serif; background:var(--bg); color:#1a1a1a; min-height:100vh; }
+header { background:var(--navy); color:white; padding:14px 20px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:20; }
+header h1 { font-size:17px; font-weight:600; }
+.container { max-width:1100px; margin:0 auto; padding:16px; }
+.login-wrap { max-width:340px; margin:80px auto; padding:32px; background:var(--card); border-radius:var(--radius); box-shadow:0 2px 8px rgba(0,0,0,.1); }
+.login-wrap h2 { font-size:20px; font-weight:700; color:var(--navy); margin-bottom:20px; text-align:center; }
+.field { margin-bottom:14px; }
+.field label { display:block; font-size:13px; color:var(--muted); margin-bottom:5px; }
+.field input { width:100%; padding:11px 12px; font-size:15px; border:2px solid var(--border); border-radius:8px; }
+.field input:focus { border-color:var(--navy); outline:none; }
+.btn { padding:9px 18px; font-size:14px; font-weight:600; border:none; border-radius:8px; cursor:pointer; }
+.btn:disabled { opacity:.55; cursor:not-allowed; }
+.btn-primary { background:var(--navy); color:white; }
+.btn-outline  { background:white; color:var(--navy); border:2px solid var(--navy); }
+.btn-danger   { background:white; color:var(--danger); border:2px solid var(--danger); }
+.btn-success  { background:var(--success); color:white; }
+.btn-warn     { background:#fff3e0; color:var(--warn); border:1px solid #ffe0b2; }
+.btn-sm       { padding:6px 13px; font-size:13px; }
+.btn-full     { width:100%; padding:13px; font-size:16px; }
+.control-bar { background:var(--card); border-radius:var(--radius); padding:12px 16px; margin-bottom:12px; display:flex; align-items:center; gap:10px; flex-wrap:wrap; box-shadow:0 1px 3px rgba(0,0,0,.07); }
+.control-bar label { font-size:14px; color:var(--muted); white-space:nowrap; }
+.control-bar select { padding:7px 12px; font-size:14px; border:2px solid var(--border); border-radius:8px; background:white; }
+.control-bar select:focus { border-color:var(--navy); outline:none; }
+.last-update { font-size:12px; color:var(--muted); margin-left:auto; }
+.tab-groups { display:flex; gap:8px; margin-bottom:14px; flex-wrap:wrap; }
+.tab-group { display:flex; gap:3px; background:var(--card); border-radius:9px; padding:4px; box-shadow:0 1px 3px rgba(0,0,0,.07); }
+.tab-group-label { font-size:11px; color:var(--muted); padding:8px 8px 0; letter-spacing:.5px; }
+.tab-btn { padding:8px 16px; font-size:13px; font-weight:600; border:none; border-radius:7px; background:transparent; color:var(--muted); cursor:pointer; }
+.tab-btn.active { background:var(--navy); color:white; }
+.tab-btn:not(.active):hover { background:var(--navy-light); color:var(--navy); }
+.stat-row { display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); gap:10px; margin-bottom:14px; }
+.stat-card { background:var(--card); border-radius:var(--radius); padding:14px 16px; box-shadow:0 1px 3px rgba(0,0,0,.07); }
+.stat-card .num { font-size:28px; font-weight:800; color:var(--navy); }
+.stat-card .lbl { font-size:12px; color:var(--muted); margin-top:2px; }
+.stat-card.warn .num { color:var(--warn); }
+.table-wrap { background:var(--card); border-radius:var(--radius); overflow:auto; box-shadow:0 1px 3px rgba(0,0,0,.07); }
+table { width:100%; border-collapse:collapse; font-size:14px; }
+th { background:var(--navy); color:white; padding:10px 12px; text-align:left; white-space:nowrap; font-weight:600; }
+td { padding:8px 12px; border-bottom:1px solid var(--border); white-space:nowrap; vertical-align:middle; }
+tr:last-child td { border-bottom:none; }
+tr.unreported { background:#fff8f0; }
+tr.total-row td { background:#f0ede8; font-weight:700; border-top:2px solid var(--border); }
+.badge { display:inline-block; padding:3px 9px; border-radius:20px; font-size:12px; font-weight:600; }
+.badge-ok     { background:#e8f5e9; color:var(--success); }
+.badge-wait   { background:#fff3e0; color:var(--warn); }
+.badge-active { background:#e8f0fb; color:var(--navy); }
+.badge-ended  { background:#f5f5f5; color:#999; }
+.diff-pos { color:#1565c0; }
+.diff-neg { color:var(--danger); }
+.hall-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:12px; }
+.hall-card { background:var(--card); border-radius:var(--radius); padding:16px; box-shadow:0 1px 3px rgba(0,0,0,.07); }
+.hall-card.main-hall { border-left:4px solid var(--navy); }
+.hall-title { font-size:13px; font-weight:700; color:var(--navy); margin-bottom:8px; }
+.hall-count { font-size:32px; font-weight:800; color:var(--navy); margin-bottom:8px; }
+.hall-count span { font-size:14px; font-weight:400; color:var(--muted); }
+.detail-list { font-size:13px; color:var(--muted); border-top:1px solid var(--border); padding-top:8px; }
+.detail-row { display:flex; justify-content:space-between; padding:3px 0; }
+.section-card { background:var(--card); border-radius:var(--radius); padding:18px; margin-bottom:14px; box-shadow:0 1px 3px rgba(0,0,0,.07); }
+.section-title { font-size:15px; font-weight:700; color:var(--navy); margin-bottom:14px; }
+.form-row { display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; }
+.form-row .f { display:flex; flex-direction:column; gap:5px; }
+.form-row label { font-size:12px; color:var(--muted); }
+.form-row input[type="text"],
+.form-row input[type="date"] { padding:9px 12px; font-size:14px; border:2px solid var(--border); border-radius:8px; }
+.form-row input:focus { border-color:var(--navy); outline:none; }
+.form-row input[type="text"] { min-width:220px; }
+.setup-toolbar { display:flex; align-items:center; gap:10px; margin-bottom:12px; flex-wrap:wrap; }
+.setup-num { width:62px; padding:6px 4px; font-size:14px; font-weight:600; text-align:center; border:1px solid var(--border); border-radius:6px; color:var(--navy); background:white; }
+.setup-num:focus { border-color:var(--navy); outline:none; }
+.setup-text { min-width:180px; width:100%; padding:6px 8px; font-size:13px; border:1px solid var(--border); border-radius:6px; background:white; }
+.setup-text:focus { border-color:var(--navy); outline:none; }
+.save-notice { font-size:13px; color:var(--success); display:none; }
+.screen { display:none; }
+.screen.active { display:block; }
+.tab-content { display:none; }
+.tab-content.active { display:block; }
+.error-msg { color:var(--danger); font-size:14px; text-align:center; margin-top:8px; min-height:20px; }
+.empty-msg { text-align:center; padding:40px; color:var(--muted); font-size:14px; }
+.upload-bar { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:12px; }
+.upload-hint { font-size:12px; color:var(--muted); }
+.btn-teal { background:#e0f2f1; color:#00695c; border:1px solid #b2dfdb; font-weight:600; }
+.comp-fbtn { background:white; color:var(--muted); border:2px solid var(--border); }
+.comp-fbtn.active { background:var(--navy); color:white; border-color:var(--navy); }
+.stat-card.clickable { cursor:pointer; transition:box-shadow .15s; }
+.stat-card.clickable:hover { box-shadow:0 3px 10px rgba(0,0,0,.15); }
+.stat-card.clickable.selected { outline:3px solid var(--navy); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>中台禪寺 — 法會人數後台</h1>
+</header>
+
+<div id="screen-login" class="screen active">
+  <div class="login-wrap">
+    <h2>後台登入</h2>
+    <div class="field">
+      <label>管理員密碼</label>
+      <input id="inp-pwd" type="password" onkeydown="if(event.key==='Enter') doAdminLogin()">
+    </div>
+    <button class="btn btn-primary btn-full" id="btn-login" onclick="doAdminLogin()">登入</button>
+    <div id="login-error" class="error-msg"></div>
+  </div>
+</div>
+
+<div id="screen-main" class="screen">
+  <div class="container">
+
+    <div class="control-bar">
+      <label>活動：</label>
+      <select id="activity-select" onchange="onActivityChange()">
+        <option value="">— 請選擇活動 —</option>
+      </select>
+      <button class="btn btn-outline btn-sm" onclick="refreshData()">↻ 重新整理</button>
+      <button class="btn btn-outline btn-sm" id="btn-download" onclick="downloadExcel()" style="display:none;">⬇ 下載 Excel</button>
+      <span class="last-update" id="last-update"></span>
+    </div>
+
+    <div class="tab-groups">
+      <div>
+        <div class="tab-group-label">查看</div>
+        <div class="tab-group">
+          <button class="tab-btn active" onclick="switchTab('comparison')">比較總覽</button>
+          <button class="tab-btn" onclick="switchTab('hall')">殿堂視角</button>
+          <button class="tab-btn" onclick="switchTab('temple')">精舍視角</button>
+          <button class="tab-btn" onclick="switchTab('meal')">齋供視角</button>
+        </div>
+      </div>
+      <div>
+        <div class="tab-group-label">設定</div>
+        <div class="tab-group">
+          <button class="tab-btn" onclick="switchTab('activity')">活動管理</button>
+          <button class="tab-btn" onclick="switchTab('setup')">預估人數</button>
+          <button class="tab-btn" onclick="switchTab('temples')">精舍名單</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="tab-comparison" class="tab-content active">
+      <div id="comp-stats" class="stat-row"></div>
+      <div id="comp-filter-bar" style="display:none;margin-bottom:10px;gap:6px;flex-wrap:wrap;" class="upload-bar">
+        <button class="btn btn-sm comp-fbtn active" onclick="setCompFilter('all')">全部</button>
+        <button class="btn btn-sm comp-fbtn" onclick="setCompFilter('reported')">已回報</button>
+        <button class="btn btn-sm comp-fbtn" onclick="setCompFilter('unreported')">未回報</button>
+        <span id="comp-filter-hint" style="font-size:12px;color:var(--muted);"></span>
+      </div>
+      <div class="table-wrap">
+        <table><thead><tr>
+          <th>精舍</th><th>報名</th><th>已回報</th><th>差異數</th><th>落差率</th><th>回報時間</th><th>狀態</th>
+        </tr></thead>
+        <tbody id="comp-body"><tr><td colspan="7" class="empty-msg">請先選擇活動</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div id="tab-hall" class="tab-content">
+      <div id="hall-content"><div class="empty-msg">請先選擇活動</div></div>
+    </div>
+
+    <div id="tab-meal" class="tab-content">
+      <div id="meal-content"><div class="empty-msg">請先選擇活動</div></div>
+    </div>
+
+    <div id="tab-temple" class="tab-content">
+      <div class="table-wrap">
+        <table><thead><tr>
+          <th>精舍</th><th>信眾</th><th>法師</th><th>義工</th><th>便當數</th><th>合計</th><th>回報時間</th>
+        </tr></thead>
+        <tbody id="temple-body"><tr><td colspan="7" class="empty-msg">請先選擇活動</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div id="tab-activity" class="tab-content">
+      <div class="upload-bar" style="margin-bottom:0;padding:12px 0 0;">
+        <button class="btn btn-teal btn-sm" onclick="dlTemplateActivity()">⬇ 下載範本</button>
+        <button class="btn btn-outline btn-sm" onclick="document.getElementById('file-activity').click()">⬆ 批次新增活動</button>
+        <input type="file" id="file-activity" accept=".csv,.xlsx,.xls" style="display:none" onchange="handleUploadActivity(this)">
+        <span class="upload-hint">格式：活動名稱, 活動日期（支援 Excel / CSV）</span>
+      </div>
+      <div class="section-card" style="margin-top:12px;">
+        <div class="section-title">手動新增活動</div>
+        <div class="form-row">
+          <div class="f"><label>活動名稱</label><input type="text" id="new-act-name" placeholder="例：2026秋季禪七"></div>
+          <div class="f"><label>活動日期</label><input type="date" id="new-act-date"></div>
+          <button class="btn btn-primary" id="btn-create" onclick="doCreateActivity()">新增</button>
+        </div>
+        <div id="create-msg" style="font-size:13px;margin-top:10px;min-height:18px;"></div>
+      </div>
+      <div class="table-wrap">
+        <table><thead><tr><th>活動ID</th><th>活動名稱</th><th>日期</th><th>狀態</th><th>操作</th></tr></thead>
+        <tbody id="act-body"><tr><td colspan="5" class="empty-msg">載入中…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div id="tab-temples" class="tab-content">
+      <div class="upload-bar">
+        <button class="btn btn-teal btn-sm" onclick="dlTemplateTemple()">⬇ 下載範本</button>
+        <button class="btn btn-outline btn-sm" onclick="document.getElementById('file-temple').click()">⬆ 上傳名單</button>
+        <input type="file" id="file-temple" accept=".csv,.xlsx,.xls" style="display:none" onchange="handleUploadTemple(this)">
+        <span class="upload-hint">格式：精舍編號, 精舍名稱, 帳號, 密碼（支援 Excel / CSV）</span>
+      </div>
+      <div class="table-wrap">
+        <table><thead><tr><th>#</th><th>精舍編號</th><th>精舍名稱</th><th>帳號</th><th>密碼</th></tr></thead>
+        <tbody id="temples-body"><tr><td colspan="5" class="empty-msg">載入中…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div id="tab-setup" class="tab-content">
+      <div class="upload-bar">
+        <button class="btn btn-teal btn-sm" onclick="dlTemplateSetup()">⬇ 下載範本</button>
+        <button class="btn btn-outline btn-sm" onclick="document.getElementById('file-setup').click()">⬆ 上傳設定</button>
+        <button class="btn btn-outline btn-sm" onclick="copyFromPrevEvent()">↩ 複製上場預估</button>
+        <input type="file" id="file-setup" accept=".csv,.xlsx,.xls" style="display:none" onchange="handleUploadSetup(this)">
+        <span class="upload-hint" id="setup-upload-hint">格式：精舍編號, 預估信眾/法師/義工/便當數/預設座位數, 休息區說明（支援 Excel / CSV）</span>
+      </div>
+      <div class="setup-toolbar">
+        <button class="btn btn-success" id="btn-save-setup" onclick="doSaveSetup()">儲存全部</button>
+        <span class="save-notice" id="save-notice">✓ 已儲存</span>
+        <span style="font-size:13px;color:var(--muted);">修改後記得按「儲存全部」</span>
+      </div>
+      <div class="table-wrap">
+        <table><thead><tr>
+          <th>#</th><th>精舍名稱</th><th>預估信眾</th><th>預估法師</th><th>預估義工</th><th>預估便當數</th><th>預設座位數</th><th>休息區說明</th>
+        </tr></thead>
+        <tbody id="setup-body"><tr><td colspan="8" class="empty-msg">請先選擇活動</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// ── 填入你的 Supabase 設定 ──────────────────────────────────
+const SUPABASE_URL  = 'https://dfqcbwresfwejiudlqso.supabase.co';
+const SUPABASE_KEY  = 'sb_publishable_NnGcMxbnG_D_3qDeFahMqQ_MjSsPzHQ';
+const ADMIN_PASSWORD = 'ctcm2026'; // 可自行修改
+// ────────────────────────────────────────────────────────────
+
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+let currentTab  = 'comparison';
+let dashCache   = null;
+let compFilter  = 'all'; // 'all' | 'reported' | 'unreported'
+
+function show(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+/* ── 登入 ── */
+function doAdminLogin() {
+  const pwd = document.getElementById('inp-pwd').value;
+  if (pwd === ADMIN_PASSWORD) {
+    show('screen-main');
+    loadActivities();
+  } else {
+    document.getElementById('login-error').textContent = '密碼錯誤';
+  }
+}
+
+/* ── 活動選單 ── */
+async function loadActivities() {
+  const { data } = await sb.from('events').select('*').order('created_at', { ascending: false });
+  if (!data) return;
+  const sel = document.getElementById('activity-select');
+  while (sel.options.length > 1) sel.remove(1);
+  data.forEach(a => {
+    const opt = document.createElement('option');
+    opt.value = a.id;
+    opt.textContent = a.name + '（' + a.status + '）';
+    if (a.status === '進行中') opt.selected = true;
+    sel.appendChild(opt);
+  });
+  if (sel.value) fetchDashboard(sel.value);
+  else if (currentTab === 'activity') loadActivityList();
+}
+
+function onActivityChange() {
+  const actId = document.getElementById('activity-select').value;
+  if (actId) fetchDashboard(actId);
+}
+
+/* ── 一次抓回全部資料（平行查詢）── */
+async function fetchDashboard(actId) {
+  dashCache = null;
+  document.getElementById('last-update').textContent = '載入中…';
+
+  const [templesRes, estRes, restRes, repRes] = await Promise.all([
+    sb.from('temples').select('*').order('number'),
+    sb.from('estimates').select('*').eq('event_id', actId),
+    sb.from('rest_areas').select('*').eq('event_id', actId),
+    sb.from('reports').select('*').eq('event_id', actId)
+  ]);
+
+  const temples = templesRes.data || [];
+  const estMap  = Object.fromEntries((estRes.data || []).map(r => [r.temple_number, r]));
+  const restMap = Object.fromEntries((restRes.data || []).map(r => [r.temple_number, r.description]));
+  const repMap  = Object.fromEntries((repRes.data || []).map(r => [r.temple_number, r]));
+
+  // 比較總覽（只計入有在精舍設定填入預估人數的精舍）
+  const compRows = temples.filter(t => estMap[t.number] !== undefined).map(t => {
+    const est = estMap[t.number];
+    const rep = repMap[t.number];
+    const estTotal = est ? est.vip+est.lay+est.monk+(est.volunteer||0)+est.driver : null;
+    const repTotal = rep ? rep.vip+rep.lay+rep.monk+(rep.volunteer||0)+rep.driver : null;
+    let 落差 = null, 落差率 = null;
+    if (estTotal !== null && repTotal !== null) {
+      落差 = repTotal - estTotal;
+      落差率 = estTotal > 0 ? ((落差/estTotal)*100).toFixed(1)+'%' : (落差===0?'0%':'—');
+    }
+    return {
+      number: t.number, name: t.name,
+      estTotal, repTotal, 落差, 落差率,
+      reported: !!rep,
+      reportedAt: rep ? new Date(rep.reported_at).toLocaleString('zh-TW',{timeZone:'Asia/Taipei'}) : null
+    };
+  });
+
+  // 殿堂視角
+  const hallMap = {};
+  let totalRepLayMonk = 0;
+  let totalSeatCount  = 0;
+  temples.forEach(t => {
+    const rep = repMap[t.number];
+    const est = estMap[t.number];
+    totalSeatCount += est?.seat_count || 0;
+    if (!rep) return;
+    const 信眾 = (rep.vip||0) + rep.lay;
+    totalRepLayMonk += 信眾 + rep.monk;
+    const hall = restMap[t.number] || '（未分配）';
+    if (!hallMap[hall]) hallMap[hall] = { count: 0, detail: [] };
+    hallMap[hall].count += 信眾 + rep.monk;
+    hallMap[hall].detail.push({ name: t.name, lay: 信眾, monk: rep.monk, sub: 信眾+rep.monk });
+  });
+  const mainCount = totalRepLayMonk - totalSeatCount;
+
+  // 精舍視角
+  const templeRows = temples
+    .map(t => {
+      const rep = repMap[t.number];
+      if (!rep) return null;
+      const 信眾 = (rep.vip||0) + rep.lay;
+      const volunteer = rep.volunteer || 0;
+      return { number: t.number, name: t.name, 信眾, monk: rep.monk, volunteer, driver: rep.driver,
+               total: 信眾+rep.monk+volunteer+rep.driver,
+               reportedAt: new Date(rep.reported_at).toLocaleString('zh-TW',{timeZone:'Asia/Taipei'}) };
+    }).filter(Boolean);
+  const 總計 = templeRows.reduce(
+    (a, r) => ({ 信眾:a.信眾+r.信眾, monk:a.monk+r.monk, volunteer:a.volunteer+r.volunteer, driver:a.driver+r.driver, total:a.total+r.total }),
+    { 信眾:0, monk:0, volunteer:0, driver:0, total:0 }
+  );
+
+  // 齋供視角（依殿堂加總便當數）
+  const mealMap = {};
+  let mealTotal = 0;
+  temples.forEach(t => {
+    const rep = repMap[t.number];
+    if (!rep) return;
+    const hall = restMap[t.number] || '（未分配）';
+    if (!mealMap[hall]) mealMap[hall] = { count: 0, detail: [] };
+    mealMap[hall].count += rep.driver;
+    mealMap[hall].detail.push({ name: t.name, count: rep.driver });
+    mealTotal += rep.driver;
+  });
+
+  // 精舍設定
+  const setupRows = temples.map(t => {
+    const est = estMap[t.number] || {};
+    return { number: t.number, name: t.name,
+             lay: (est.vip||0)+(est.lay||0), monk: est.monk||0, volunteer: est.volunteer||0, driver: est.driver||0,
+             seat_count: est.seat_count||0, rest: restMap[t.number] || '' };
+  });
+
+  const actName = document.getElementById('activity-select').selectedOptions[0]?.textContent || actId;
+  dashCache = { actId, actName, compRows, mainCount, totalSeatCount, hallMap, mealMap, mealTotal, templeRows, 總計, setupRows,
+                未回報數: compRows.filter(r => !r.reported).length };
+  document.getElementById('last-update').textContent =
+    '更新：' + new Date().toLocaleTimeString('zh-TW',{timeZone:'Asia/Taipei'});
+  document.getElementById('btn-download').style.display = 'inline-block';
+  renderCurrentTab();
+}
+
+function refreshData() {
+  const actId = document.getElementById('activity-select').value;
+  if (currentTab === 'activity') { loadActivityList(); return; }
+  if (actId) fetchDashboard(actId);
+}
+
+/* ── 分頁切換 ── */
+const ALL_TABS = ['comparison','hall','temple','meal','activity','setup','temples'];
+
+function switchTab(tab) {
+  currentTab = tab;
+  document.querySelectorAll('.tab-btn').forEach(b =>
+    b.classList.toggle('active', b.getAttribute('onclick').includes("'"+tab+"'"))
+  );
+  ALL_TABS.forEach(t => {
+    const el = document.getElementById('tab-'+t);
+    if (el) el.classList.toggle('active', t === tab);
+  });
+  renderCurrentTab();
+}
+
+function renderCurrentTab() {
+  if (currentTab === 'activity') { loadActivityList(); return; }
+  if (currentTab === 'temples')  { loadTempleList(); return; }
+  if (!dashCache) return;
+  if (currentTab === 'comparison') renderComparison();
+  else if (currentTab === 'hall')   renderHall();
+  else if (currentTab === 'temple') renderTemple();
+  else if (currentTab === 'meal')   renderMeal();
+  else if (currentTab === 'setup')  renderSetup();
+}
+
+/* ── 比較總覽 ── */
+function setCompFilter(f) {
+  compFilter = f;
+  document.querySelectorAll('.comp-fbtn').forEach(b =>
+    b.classList.toggle('active', b.getAttribute('onclick').includes("'"+f+"'"))
+  );
+  renderComparison();
+}
+
+function renderComparison() {
+  const rows = dashCache.compRows;
+  const reported = rows.filter(r => r.reported).length;
+  const repSum   = rows.reduce((a,r) => a+(r.repTotal||0), 0);
+
+  // 統計卡片（已回報 / 未回報 可點擊篩選）
+  document.getElementById('comp-stats').innerHTML =
+    sc(rows.length, '精舍總數', false, '') +
+    sc(reported, '已回報', false, 'onclick="setCompFilter(compFilter===\'reported\'?\'all\':\'reported\')"') +
+    sc(dashCache.未回報數, '尚未回報', dashCache.未回報數>0, 'onclick="setCompFilter(compFilter===\'unreported\'?\'all\':\'unreported\')"') +
+    sc(repSum, '目前實際總人數', false, '');
+
+  // 加上可點擊樣式
+  document.querySelectorAll('#comp-stats .stat-card').forEach((el, i) => {
+    if (i === 1 || i === 2) {
+      el.classList.add('clickable');
+      if ((i===1 && compFilter==='reported') || (i===2 && compFilter==='unreported'))
+        el.classList.add('selected');
+    }
+  });
+
+  // 篩選列
+  const bar = document.getElementById('comp-filter-bar');
+  bar.style.display = 'flex';
+  const hint = document.getElementById('comp-filter-hint');
+  if (compFilter === 'reported')   hint.textContent = `顯示 ${reported} 間已回報精舍`;
+  else if (compFilter === 'unreported') hint.textContent = `顯示 ${dashCache.未回報數} 間未回報精舍`;
+  else hint.textContent = '';
+
+  // 套用篩選並排序
+  let display = [...rows];
+  if (compFilter === 'reported')   display = display.filter(r => r.reported);
+  if (compFilter === 'unreported') display = display.filter(r => !r.reported);
+  display.sort((a,b) => {
+    if (compFilter === 'all' && a.reported !== b.reported) return a.reported ? 1 : -1;
+    return a.number.localeCompare(b.number);
+  });
+
+  document.getElementById('comp-body').innerHTML = display.map(r => {
+    const cls   = !r.reported ? ' class="unreported"' : '';
+    const badge = r.reported
+      ? '<span class="badge badge-ok">已回報</span>'
+      : '<span class="badge badge-wait">未回報</span>';
+    const diff    = r.落差===null ? '—' : (r.落差>0?'+'+r.落差:r.落差);
+    const diffCls = r.落差===null ? '' : (r.落差>=0?' class="diff-pos"':' class="diff-neg"');
+    return `<tr${cls}><td>${r.name}</td>
+      <td>${r.estTotal===null?'—':r.estTotal}</td>
+      <td>${r.repTotal===null?'—':r.repTotal}</td>
+      <td${diffCls}>${diff}</td>
+      <td>${r.落差率||'—'}</td>
+      <td>${r.reportedAt||'—'}</td>
+      <td>${badge}</td></tr>`;
+  }).join('') || '<tr><td colspan="7" class="empty-msg">無資料</td></tr>';
+}
+
+/* ── 殿堂視角 ── */
+function renderHall() {
+  const c = dashCache;
+  let html = '<div class="hall-grid">';
+  html += `<div class="hall-card main-hall">
+    <div class="hall-title">🏛 主壇</div>
+    <div class="hall-count">${c.mainCount} <span>人</span></div>
+    <div class="detail-list">
+      <div class="detail-row"><span>全場信眾+法師</span><span>${c.mainCount + c.totalSeatCount} 人</span></div>
+      <div class="detail-row"><span>預設座位數（各休息區）</span><span>－${c.totalSeatCount} 席</span></div>
+    </div></div>`;
+  Object.entries(c.hallMap).forEach(([hall, v]) => {
+    html += `<div class="hall-card">
+      <div class="hall-title">📍 ${hall}</div>
+      <div class="hall-count">${v.count} <span>人（信眾+法師）</span></div>`;
+    if (v.detail.length) html += '<div class="detail-list">' +
+      v.detail.map(d => `<div class="detail-row"><span>${d.name}</span><span>眾 ${d.lay}＋師 ${d.monk} ＝ ${d.sub}</span></div>`).join('') +
+      '</div>';
+    html += '</div>';
+  });
+  document.getElementById('hall-content').innerHTML = html + '</div>';
+}
+
+/* ── 精舍視角 ── */
+function renderTemple() {
+  const t = dashCache.總計;
+  document.getElementById('temple-body').innerHTML =
+    dashCache.templeRows.map(r =>
+      `<tr><td>${r.name}</td><td>${r.信眾}</td><td>${r.monk}</td><td>${r.volunteer}</td><td>${r.driver}</td><td><strong>${r.total}</strong></td><td>${r.reportedAt}</td></tr>`
+    ).join('') +
+    `<tr class="total-row"><td>合計</td><td>${t.信眾}</td><td>${t.monk}</td><td>${t.volunteer}</td><td>${t.driver}</td><td>${t.total}</td><td></td></tr>`
+    || '<tr><td colspan="7" class="empty-msg">尚無回報資料</td></tr>';
+}
+
+/* ── 齋供視角 ── */
+function renderMeal() {
+  const c = dashCache;
+  const entries = Object.entries(c.mealMap);
+  if (!entries.length) {
+    document.getElementById('meal-content').innerHTML = '<div class="empty-msg">尚無回報資料</div>';
+    return;
+  }
+  let html = '<div class="hall-grid">';
+  entries.forEach(([hall, v]) => {
+    html += `<div class="hall-card">
+      <div class="hall-title">🍱 ${hall}</div>
+      <div class="hall-count">${v.count} <span>份</span></div>`;
+    if (v.detail.length) html += '<div class="detail-list">' +
+      v.detail.map(d => `<div class="detail-row"><span>${d.name}</span><span>${d.count} 份</span></div>`).join('') +
+      '</div>';
+    html += '</div>';
+  });
+  html += `<div class="hall-card" style="background:#f0ede8;">
+    <div class="hall-title">📊 便當總計</div>
+    <div class="hall-count">${c.mealTotal} <span>份</span></div>
+  </div>`;
+  document.getElementById('meal-content').innerHTML = html + '</div>';
+}
+
+/* ── 活動管理 ── */
+async function loadActivityList() {
+  const { data } = await sb.from('events').select('*').order('created_at', { ascending: false });
+  document.getElementById('act-body').innerHTML = (data||[]).map(a => {
+    const badge = a.status === '進行中'
+      ? '<span class="badge badge-active">進行中</span>'
+      : '<span class="badge badge-ended">已結束</span>';
+    const toggleBtn = a.status === '進行中'
+      ? `<button class="btn btn-sm btn-danger" onclick="setStatus('${a.id}','已結束')">設為已結束</button>`
+      : `<button class="btn btn-sm btn-warn" onclick="setStatus('${a.id}','進行中')">設為進行中</button>`;
+    return `<tr><td style="color:var(--muted);font-size:12px;">${a.id}</td>
+      <td>${a.name}</td><td>${a.date}</td><td>${badge}</td>
+      <td style="display:flex;gap:6px;flex-wrap:wrap;">${toggleBtn}
+        <button class="btn btn-sm btn-danger" onclick="deleteActivity('${a.id}','${a.name}')">刪除</button>
+      </td></tr>`;
+  }).join('') || '<tr><td colspan="5" class="empty-msg">尚無活動</td></tr>';
+}
+
+async function doCreateActivity() {
+  const name = document.getElementById('new-act-name').value.trim();
+  const date = document.getElementById('new-act-date').value;
+  if (!name) { showMsg('請輸入活動名稱', true); return; }
+  if (!date) { showMsg('請選擇活動日期', true); return; }
+  setBtn('btn-create', true, '新增中…');
+
+  const { data: existing } = await sb.from('events').select('id').order('created_at', { ascending: false }).limit(1);
+  const lastNum = existing?.length
+    ? parseInt(existing[0].id.replace('ACT','')) || 0
+    : 0;
+  const newId = 'ACT' + String(lastNum + 1).padStart(3, '0');
+
+  const { error } = await sb.from('events').insert({ id: newId, name, date, status: '已結束' });
+  setBtn('btn-create', false, '新增');
+  if (error) { showMsg(error.message, true); return; }
+  showMsg('✓ 活動 '+newId+' 建立成功', false);
+  document.getElementById('new-act-name').value = '';
+  document.getElementById('new-act-date').value = '';
+  loadActivityList();
+  loadActivities();
+}
+
+async function deleteActivity(actId, actName) {
+  if (!confirm(`確定要刪除「${actName}」嗎？\n\n相關的預估人數、休息區分配、回報紀錄也會一併刪除，無法復原。`)) return;
+  // 依外鍵順序刪除子資料再刪活動
+  await Promise.all([
+    sb.from('estimates').delete().eq('event_id', actId),
+    sb.from('rest_areas').delete().eq('event_id', actId),
+    sb.from('reports').delete().eq('event_id', actId)
+  ]);
+  const { error } = await sb.from('events').delete().eq('id', actId);
+  if (error) { alert('刪除失敗：' + error.message); return; }
+  if (dashCache?.actId === actId) {
+    dashCache = null;
+    document.getElementById('btn-download').style.display = 'none';
+    document.getElementById('last-update').textContent = '';
+  }
+  loadActivityList();
+  loadActivities();
+}
+
+async function setStatus(actId, status) {
+  if (status === '進行中') {
+    await sb.from('events').update({ status: '已結束' }).eq('status', '進行中');
+  }
+  await sb.from('events').update({ status }).eq('id', actId);
+  loadActivityList();
+  loadActivities();
+}
+
+function showMsg(msg, isErr) {
+  const el = document.getElementById('create-msg');
+  el.textContent = msg;
+  el.style.color = isErr ? 'var(--danger)' : 'var(--success)';
+}
+
+/* ── 精舍設定 ── */
+function renderSetup() {
+  document.getElementById('setup-body').innerHTML = dashCache.setupRows.map((r, i) =>
+    `<tr data-num="${r.number}">
+      <td style="color:var(--muted);font-size:12px;">${i+1}</td>
+      <td><strong>${r.name}</strong></td>
+      <td><input type="number" class="setup-num" data-f="lay"       min="0" value="${r.lay}"></td>
+      <td><input type="number" class="setup-num" data-f="monk"      min="0" value="${r.monk}"></td>
+      <td><input type="number" class="setup-num" data-f="volunteer" min="0" value="${r.volunteer||0}"></td>
+      <td><input type="number" class="setup-num" data-f="driver"    min="0" value="${r.driver}"></td>
+      <td><input type="number" class="setup-num" data-f="seat_count" min="0" value="${r.seat_count||0}"></td>
+      <td><input type="text" class="setup-text" data-f="rest" value="${esc(r.rest)}"></td>
+    </tr>`
+  ).join('') || '<tr><td colspan="8" class="empty-msg">精舍名單為空</td></tr>';
+}
+
+async function doSaveSetup() {
+  const actId = document.getElementById('activity-select').value;
+  if (!actId) { alert('請先選擇活動'); return; }
+  const rows = [];
+  document.querySelectorAll('#setup-body tr[data-num]').forEach(tr => {
+    const num = tr.getAttribute('data-num');
+    const lay        = parseInt(tr.querySelector('[data-f="lay"]').value)        || 0;
+    const monk       = parseInt(tr.querySelector('[data-f="monk"]').value)       || 0;
+    const volunteer  = parseInt(tr.querySelector('[data-f="volunteer"]').value)  || 0;
+    const driver     = parseInt(tr.querySelector('[data-f="driver"]').value)     || 0;
+    const seat_count = parseInt(tr.querySelector('[data-f="seat_count"]').value) || 0;
+    const rest       = tr.querySelector('[data-f="rest"]').value.trim();
+    rows.push({ event_id: actId, temple_number: num, vip:0, lay, monk, volunteer, driver, seat_count });
+    if (rest) { rows[rows.length-1]._rest = rest; }
+  });
+  if (!rows.length) { alert('沒有資料可儲存'); return; }
+  setBtn('btn-save-setup', true, '儲存中…');
+
+  const estRows  = rows.map(r => ({ event_id:r.event_id, temple_number:r.temple_number, vip:0, lay:r.lay, monk:r.monk, volunteer:r.volunteer, driver:r.driver, seat_count:r.seat_count }));
+  const restRows = rows.filter(r => r._rest).map(r => ({ event_id:r.event_id, temple_number:r.temple_number, description:r._rest }));
+
+  const [e1, e2] = await Promise.all([
+    sb.from('estimates').upsert(estRows, { onConflict: 'event_id,temple_number' }),
+    sb.from('rest_areas').upsert(restRows, { onConflict: 'event_id,temple_number' })
+  ]);
+
+  setBtn('btn-save-setup', false, '儲存全部');
+  if (e1.error || e2.error) { alert('儲存失敗：' + (e1.error||e2.error).message); return; }
+  const notice = document.getElementById('save-notice');
+  notice.style.display = 'inline';
+  setTimeout(() => { notice.style.display = 'none'; }, 3000);
+  dashCache = null;
+}
+
+async function copyFromPrevEvent() {
+  const actId = document.getElementById('activity-select').value;
+  if (!actId) { alert('請先選擇活動'); return; }
+
+  // 取得最近一場「其他活動」
+  const { data: events } = await sb.from('events')
+    .select('id, name')
+    .neq('id', actId)
+    .order('date', { ascending: false })
+    .limit(5);
+
+  if (!events?.length) { alert('找不到其他活動可複製'); return; }
+
+  // 如果有多場，讓使用者選；只有一場就直接用
+  let prev;
+  if (events.length === 1) {
+    prev = events[0];
+    if (!confirm(`將從「${prev.name}」複製預估人數和休息區設定，確定嗎？`)) return;
+  } else {
+    const opts = events.map((e, i) => `${i+1}. ${e.name}`).join('\n');
+    const choice = prompt(`選擇要複製哪場活動的預估（輸入數字）：\n${opts}`);
+    const idx = parseInt(choice) - 1;
+    if (isNaN(idx) || idx < 0 || idx >= events.length) { alert('取消'); return; }
+    prev = events[idx];
+  }
+
+  // 取得該場活動的 estimates 和 rest_areas
+  const [estRes, restRes] = await Promise.all([
+    sb.from('estimates').select('*').eq('event_id', prev.id),
+    sb.from('rest_areas').select('*').eq('event_id', prev.id)
+  ]);
+
+  const estMap  = {};
+  (estRes.data  || []).forEach(e => { estMap[e.temple_number]  = e; });
+  const restMap = {};
+  (restRes.data || []).forEach(r => { restMap[r.temple_number] = r.description; });
+
+  let filled = 0;
+  document.querySelectorAll('#setup-body tr[data-num]').forEach(tr => {
+    const num = tr.getAttribute('data-num');
+    const est = estMap[num];
+    if (est) {
+      tr.querySelector('[data-f="lay"]').value        = (est.vip||0) + (est.lay||0);
+      tr.querySelector('[data-f="monk"]').value       = est.monk;
+      tr.querySelector('[data-f="volunteer"]').value  = est.volunteer || 0;
+      tr.querySelector('[data-f="driver"]').value     = est.driver;
+      tr.querySelector('[data-f="seat_count"]').value = est.seat_count || 0;
+      filled++;
+    }
+    if (restMap[num]) tr.querySelector('[data-f="rest"]').value = restMap[num];
+  });
+
+  const hint = document.getElementById('setup-upload-hint');
+  hint.textContent = `✓ 已從「${prev.name}」複製 ${filled} 筆預估，確認後請按「儲存全部」`;
+  hint.style.color = 'var(--success)';
+}
+
+/* ── 工具 ── */
+function setBtn(id, disabled, text) {
+  const b = document.getElementById(id); b.disabled = disabled; b.textContent = text;
+}
+function sc(num, label, warn, onclick) {
+  return `<div class="stat-card${warn?' warn':''}" ${onclick||''}><div class="num">${num}</div><div class="lbl">${label}</div></div>`;
+}
+function esc(s) {
+  return (s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+/* ── CSV 解析工具 ── */
+function parseCSV(text) {
+  const lines = text.trim().replace(/\r\n/g,'\n').replace(/\r/g,'\n').split('\n');
+  return lines.map(line => {
+    const cells = []; let cur = '', inQ = false;
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (ch === '"') { inQ = !inQ; }
+      else if (ch === ',' && !inQ) { cells.push(cur.trim()); cur = ''; }
+      else { cur += ch; }
+    }
+    cells.push(cur.trim());
+    return cells;
+  });
+}
+
+/* ── 檔案解析工具（支援 CSV 和 Excel） ── */
+async function parseFile(file) {
+  const ext = file.name.split('.').pop().toLowerCase();
+  if (ext === 'xlsx' || ext === 'xls') {
+    const buf = await file.arrayBuffer();
+    const wb  = new ExcelJS.Workbook();
+    await wb.xlsx.load(buf);
+    const ws   = wb.worksheets[0];
+    const rows = [];
+    ws.eachRow({ includeEmpty: false }, row => {
+      const rv   = row.values; // ExcelJS row.values 是 1-indexed
+      const vals = [];
+      for (let i = 1; i < rv.length; i++) {
+        const v = rv[i];
+        if (v === null || v === undefined) { vals.push(''); continue; }
+        if (v instanceof Date) { vals.push(v.toISOString().slice(0, 10)); continue; }
+        if (typeof v === 'object') {
+          if (v.richText)             { vals.push(v.richText.map(r => r.text).join('')); continue; }
+          if (v.result !== undefined) { vals.push(String(v.result)); continue; }
+          if (v.text !== undefined)   { vals.push(String(v.text)); continue; }
+        }
+        vals.push(String(v).trim());
+      }
+      rows.push(vals);
+    });
+    return rows;
+  }
+  const text = await file.text();
+  return parseCSV(text);
+}
+
+function triggerXlDownload(buffer, filename) {
+  const blob = new Blob([buffer], { type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+/* ── 精舍名單管理 ── */
+async function loadTempleList() {
+  const { data } = await sb.from('temples').select('*').order('number');
+  document.getElementById('temples-body').innerHTML = (data||[]).map((t, i) =>
+    `<tr><td style="color:var(--muted);font-size:12px;">${i+1}</td>
+     <td>${t.number}</td><td><strong>${t.name}</strong></td>
+     <td>${t.account}</td>
+     <td style="letter-spacing:2px;color:var(--muted);">${'•'.repeat(t.password.length)}</td></tr>`
+  ).join('') || '<tr><td colspan="5" class="empty-msg">尚無精舍資料</td></tr>';
+}
+
+async function dlTemplateTemple() {
+  const wb = new ExcelJS.Workbook();
+  const ws = wb.addWorksheet('精舍名單');
+  const navy = { type:'pattern', pattern:'solid', fgColor:{ argb:'FF2D4A6E' } };
+  const bdr  = { style:'thin', color:{ argb:'FFD0D0D0' } };
+  const border = { top:bdr, bottom:bdr, left:bdr, right:bdr };
+  const hdr = ws.addRow(['精舍編號','精舍名稱','帳號','密碼']);
+  hdr.height = 22;
+  hdr.eachCell(c => { c.fill = navy; c.font = { bold:true, color:{ argb:'FFFFFFFF' }, size:11 }; c.alignment = { horizontal:'center', vertical:'middle' }; c.border = border; });
+  [['01','普高精舍','普高','01'], ['02','基隆精舍','基隆','02']].forEach(vals => {
+    const row = ws.addRow(vals); row.height = 20;
+    row.eachCell(c => { c.border = border; c.alignment = { vertical:'middle' }; });
+    row.getCell(1).numFmt = '@'; // 精舍編號欄強制文字，保留前置零
+  });
+  [10, 18, 12, 12].forEach((w, i) => ws.getColumn(i+1).width = w);
+  triggerXlDownload(await wb.xlsx.writeBuffer(), '精舍名單範本.xlsx');
+}
+
+async function handleUploadTemple(input) {
+  const file = input.files[0]; if (!file) return;
+  const rows = await parseFile(file);
+  input.value = '';
+  if (!rows.length) { alert('檔案是空的'); return; }
+  const headers = rows[0].map(h => h.trim());
+  const need = ['精舍編號','精舍名稱','帳號','密碼'];
+  if (!need.every(h => headers.includes(h))) {
+    alert('欄位格式不符，請確認標題列包含：' + need.join('、'));
+    return;
+  }
+  const idx = need.map(h => headers.indexOf(h));
+
+  // 先取得資料庫現有精舍，建立「整數 → 原始編號字串」對照表（處理 1 vs 01 格式問題）
+  const { data: existingT } = await sb.from('temples').select('number');
+  const numByInt = {};
+  (existingT || []).forEach(t => { numByInt[parseInt(t.number)] = t.number; });
+
+  const data = rows.slice(1).filter(r => r[idx[0]]?.trim()).map(r => {
+    let num = r[idx[0]].trim();
+    const intKey = parseInt(num);
+    // Excel 讀到的 1、2、3 自動對應資料庫的 01、02、03
+    if (!isNaN(intKey) && numByInt[intKey] && num === String(intKey)) num = numByInt[intKey];
+    return { number: num, name: r[idx[1]], account: r[idx[2]], password: r[idx[3]] };
+  });
+  if (!data.length) { alert('沒有有效資料'); return; }
+
+  const newNumbers = new Set(data.map(t => t.number));
+  const toDelete   = (existingT || []).map(t => t.number).filter(n => !newNumbers.has(n));
+  const delMsg     = toDelete.length ? `\n⚠ 資料庫有 ${toDelete.length} 筆不在名單內的精舍將被刪除（含歷史回報）` : '';
+  if (!confirm(`即將以上傳檔案完整替換精舍名單（${data.length} 筆）${delMsg}\n確定嗎？`)) return;
+
+  // 刪除不在新名單內的精舍（先刪子資料避免外鍵衝突）
+  if (toDelete.length) {
+    await Promise.all([
+      sb.from('estimates').delete().in('temple_number', toDelete),
+      sb.from('rest_areas').delete().in('temple_number', toDelete),
+      sb.from('reports').delete().in('temple_number', toDelete)
+    ]);
+    await sb.from('temples').delete().in('number', toDelete);
+  }
+
+  // 寫入新名單（強制覆蓋帳號衝突）
+  let ok = 0; const errList = [];
+  for (const t of data) {
+    await sb.from('temples')
+      .update({ account: `_old_${t.number}` })
+      .eq('account', t.account)
+      .neq('number', t.number);
+    const { error } = await sb.from('temples').upsert(t, { onConflict: 'number' });
+    if (error) errList.push(`${t.name}：${error.message}`);
+    else ok++;
+  }
+  if (errList.length) alert(`匯入完成：${ok} 筆成功，${errList.length} 筆失敗\n${errList.slice(0,3).join('\n')}`);
+  else alert(`✓ 已完整替換為 ${ok} 筆精舍`);
+  loadTempleList();
+}
+
+/* ── 精舍設定 上傳／下載範本 ── */
+async function dlTemplateSetup() {
+  if (!dashCache?.setupRows?.length) { alert('請先選擇活動'); return; }
+  const wb = new ExcelJS.Workbook();
+  const ws = wb.addWorksheet('精舍設定');
+  const navy = { type:'pattern', pattern:'solid', fgColor:{ argb:'FF2D4A6E' } };
+  const bdr  = { style:'thin', color:{ argb:'FFD0D0D0' } };
+  const border = { top:bdr, bottom:bdr, left:bdr, right:bdr };
+  const hdr = ws.addRow(['精舍編號','精舍名稱','預估信眾','預估法師','預估義工','預估便當數','預設座位數','休息區說明']);
+  hdr.height = 22;
+  hdr.eachCell(c => { c.fill = navy; c.font = { bold:true, color:{ argb:'FFFFFFFF' }, size:11 }; c.alignment = { horizontal:'center', vertical:'middle' }; c.border = border; });
+  dashCache.setupRows.forEach(r => {
+    const row = ws.addRow([r.number, r.name, r.lay, r.monk, r.volunteer||0, r.driver, r.seat_count||0, r.rest]); row.height = 20;
+    row.eachCell(c => { c.border = border; c.alignment = { vertical:'middle' }; });
+    row.getCell(1).numFmt = '@'; // 精舍編號欄強制文字，保留前置零
+  });
+  [10, 18, 10, 10, 10, 10, 10, 30].forEach((w, i) => ws.getColumn(i+1).width = w);
+  triggerXlDownload(await wb.xlsx.writeBuffer(), '精舍設定範本.xlsx');
+}
+
+async function handleUploadSetup(input) {
+  const file = input.files[0]; if (!file) return;
+  const rows = await parseFile(file);
+  input.value = '';
+  if (!rows.length) return;
+  const headers = rows[0].map(h => h.trim().replace(/^﻿/, ''));
+  const need = ['精舍編號','預估信眾','預估法師','預估義工','預估便當數','預設座位數','休息區說明'];
+  if (!need.every(h => headers.includes(h))) {
+    alert('欄位格式不符，請確認標題列包含：' + need.join('、'));
+    return;
+  }
+  const hi = k => headers.indexOf(k);
+  const hasName = headers.includes('精舍名稱');
+
+  // 建立編號 → row 的對照表，同時支援有補零（01）和沒補零（1）的格式
+  const rowMap    = {};
+  const nameMap   = {}; // 完整名稱 → row
+  const prefixMap = {}; // 資料庫名稱前兩字 → row（模糊比對用）
+  const dbNameMap = {}; // 編號 → 資料庫名稱（用於偵測更名）
+  document.querySelectorAll('#setup-body tr[data-num]').forEach(tr => {
+    const n    = tr.getAttribute('data-num');
+    const name = tr.querySelector('td:nth-child(2) strong')?.textContent?.trim();
+    rowMap[n] = tr;
+    rowMap[parseInt(n)] = tr;
+    if (name) {
+      nameMap[name] = tr;
+      if (name.length >= 2) prefixMap[name.slice(0, 2)] = tr; // 取前兩字建索引
+    }
+    dbNameMap[n] = name;
+  });
+  if (!Object.keys(rowMap).length) {
+    alert('請先選擇活動並等待精舍設定列表載入後再上傳');
+    return;
+  }
+
+  let filled = 0;
+  const nameUpdates = []; // 需要同步更新名稱的精舍
+
+  rows.slice(1).forEach(r => {
+    const raw     = r[hi('精舍編號')]?.trim();
+    const csvName = hasName ? r[hi('精舍名稱')]?.trim() : '';
+
+    // 比對順序：① 精舍編號（原始）→ ② 精舍編號（數字）→ ③ 完整名稱 → ④ 名稱前兩字模糊比對
+    const csvPrefix = csvName?.slice(0, 2);
+    const tr = rowMap[raw] || rowMap[parseInt(raw)]
+            || (csvName && nameMap[csvName])
+            || (csvPrefix && prefixMap[csvPrefix]);
+    if (!tr) return;
+    const num = tr.getAttribute('data-num');
+    tr.querySelector('[data-f="lay"]').value        = parseInt(r[hi('預估信眾')])||0;
+    tr.querySelector('[data-f="monk"]').value       = parseInt(r[hi('預估法師')])||0;
+    tr.querySelector('[data-f="volunteer"]').value  = parseInt(r[hi('預估義工')])||0;
+    tr.querySelector('[data-f="driver"]').value     = parseInt(r[hi('預估便當數')])||0;
+    tr.querySelector('[data-f="seat_count"]').value = parseInt(r[hi('預設座位數')])||0;
+    tr.querySelector('[data-f="rest"]').value       = r[hi('休息區說明')]||'';
+    filled++;
+
+    // 比對精舍名稱是否有變動（只有在用「編號」比對到、且名稱欄有新值時才更新）
+    if (hasName && csvName) {
+      const currentName = dbNameMap[num];
+      if (currentName && csvName !== currentName) {
+        nameUpdates.push({ number: num, name: csvName });
+      }
+    }
+  });
+
+  // 有名稱變動時同步更新 temples 資料表
+  if (nameUpdates.length) {
+    await Promise.all(
+      nameUpdates.map(u => sb.from('temples').update({ name: u.name }).eq('number', u.number))
+    );
+    // 更新 cache 內的名稱
+    nameUpdates.forEach(u => {
+      const row = dashCache.setupRows.find(r => r.number === u.number);
+      if (row) row.name = u.name;
+      // 同步更新表格顯示
+      const tr = document.querySelector(`#setup-body tr[data-num="${u.number}"] td:nth-child(2) strong`);
+      if (tr) tr.textContent = u.name;
+    });
+  }
+
+  const nameMsg = nameUpdates.length ? `，已同步更新 ${nameUpdates.length} 間精舍名稱` : '';
+  const hint = document.getElementById('setup-upload-hint');
+  hint.textContent = `✓ 已填入 ${filled} 筆資料${nameMsg}，確認後請按「儲存全部」`;
+  hint.style.color = 'var(--success)';
+}
+
+/* ── 活動管理 批次上傳 ── */
+async function dlTemplateActivity() {
+  const wb = new ExcelJS.Workbook();
+  const ws = wb.addWorksheet('活動匯入');
+  const navy = { type:'pattern', pattern:'solid', fgColor:{ argb:'FF2D4A6E' } };
+  const bdr  = { style:'thin', color:{ argb:'FFD0D0D0' } };
+  const border = { top:bdr, bottom:bdr, left:bdr, right:bdr };
+  const hdr = ws.addRow(['活動名稱','活動日期']);
+  hdr.height = 22;
+  hdr.eachCell(c => { c.fill = navy; c.font = { bold:true, color:{ argb:'FFFFFFFF' }, size:11 }; c.alignment = { horizontal:'center', vertical:'middle' }; c.border = border; });
+  [['2026秋季禪七','2026-10-01'], ['2026冬季禪七','2026-12-15']].forEach(vals => {
+    const row = ws.addRow(vals); row.height = 20;
+    row.eachCell(c => { c.border = border; c.alignment = { vertical:'middle' }; });
+  });
+  ws.getColumn(1).width = 25; ws.getColumn(2).width = 14;
+  triggerXlDownload(await wb.xlsx.writeBuffer(), '活動批次匯入範本.xlsx');
+}
+
+async function handleUploadActivity(input) {
+  const file = input.files[0]; if (!file) return;
+  const rows = await parseFile(file);
+  input.value = '';
+  if (!rows.length) { alert('檔案是空的'); return; }
+  const headers = rows[0].map(h => h.trim());
+  if (!['活動名稱','活動日期'].every(h => headers.includes(h))) {
+    alert('欄位格式不符，請確認標題列包含：活動名稱、活動日期');
+    return;
+  }
+  const ni = headers.indexOf('活動名稱'), di = headers.indexOf('活動日期');
+  const data = rows.slice(1).filter(r => r[ni]?.trim() && r[di]?.trim())
+    .map(r => ({ name: r[ni].trim(), date: r[di].trim() }));
+  if (!data.length) { alert('沒有有效資料'); return; }
+  if (!confirm(`即將新增 ${data.length} 場活動，確定嗎？`)) return;
+
+  const { data: existing } = await sb.from('events').select('id').order('created_at', { ascending: false }).limit(1);
+  let lastNum = existing?.length ? parseInt(existing[0].id.replace('ACT',''))||0 : 0;
+  const toInsert = data.map(a => ({
+    id: 'ACT' + String(++lastNum).padStart(3,'0'),
+    name: a.name, date: a.date, status: '已結束'
+  }));
+  const { error } = await sb.from('events').insert(toInsert);
+  if (error) { alert('匯入失敗：' + error.message); return; }
+  alert(`✓ 成功新增 ${toInsert.length} 場活動`);
+  loadActivityList();
+  loadActivities();
+}
+
+/* ── 通用下載工具 ── */
+function triggerDownload(content, filename) {
+  const blob = new Blob([content], { type:'text/csv;charset=utf-8;' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+/* ── CSV 工具（供範本下載用）── */
+function csvCell(v) {
+  const s = String(v ?? '');
+  return s.includes(',') || s.includes('"') || s.includes('\n') ? '"' + s.replace(/"/g,'""') + '"' : s;
+}
+
+/* ── Excel 下載 ── */
+async function downloadExcel() {
+  if (!dashCache) return;
+  const c   = dashCache;
+  const now = new Date().toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' });
+  const date = new Date().toLocaleDateString('zh-TW', { timeZone: 'Asia/Taipei' }).replace(/\//g, '-');
+
+  const wb = new ExcelJS.Workbook();
+  wb.creator = '中台禪寺法會人數統計系統';
+
+  // ── 共用樣式 ──
+  const NAVY_FILL  = { type:'pattern', pattern:'solid', fgColor:{ argb:'FF2D4A6E' } };
+  const GRAY_FILL  = { type:'pattern', pattern:'solid', fgColor:{ argb:'FFF0EDE8' } };
+  const OG_FILL    = { type:'pattern', pattern:'solid', fgColor:{ argb:'FFFFF8F0' } };
+  const BLUE_FILL  = { type:'pattern', pattern:'solid', fgColor:{ argb:'FFE8F0FB' } };
+  const THIN = { style:'thin', color:{ argb:'FFD0D0D0' } };
+  const BORDER = { top:THIN, bottom:THIN, left:THIN, right:THIN };
+  const MID   = { vertical:'middle' };
+  const CENTER = { horizontal:'center', vertical:'middle' };
+
+  function titleRow(ws, text, cols) {
+    ws.mergeCells(1, 1, 1, cols);
+    const c1 = ws.getCell('A1');
+    c1.value = text;
+    c1.font  = { bold:true, size:14, color:{ argb:'FF2D4A6E' } };
+    c1.alignment = CENTER;
+    c1.fill  = BLUE_FILL;
+    ws.getRow(1).height = 30;
+    ws.mergeCells(2, 1, 2, cols);
+    const c2 = ws.getCell('A2');
+    c2.value = '下載時間：' + now;
+    c2.font  = { size:10, color:{ argb:'FF888888' } };
+  }
+
+  function hdrRow(ws, vals) {
+    const row = ws.addRow(vals);
+    row.height = 22;
+    for (let i = 1; i <= vals.length; i++) {
+      const cell = row.getCell(i);
+      cell.fill = NAVY_FILL;
+      cell.font = { bold:true, color:{ argb:'FFFFFFFF' }, size:11 };
+      cell.alignment = CENTER;
+      cell.border = BORDER;
+    }
+    return row;
+  }
+
+  function dataRow(ws, vals, fill, centerCols) {
+    const row = ws.addRow(vals);
+    row.height = 20;
+    for (let i = 1; i <= vals.length; i++) {
+      const cell = row.getCell(i);
+      if (fill) cell.fill = fill;
+      cell.border = BORDER;
+      cell.alignment = (centerCols && centerCols.includes(i)) ? CENTER : MID;
+    }
+    return row;
+  }
+
+  // ── 比較表共用函式 ──
+  const reported    = c.compRows.filter(r => r.reported).length;
+  const unreported  = c.compRows.filter(r => !r.reported);
+
+  function addCompSheet(sheetName, title, rows, showStats) {
+    const ws = wb.addWorksheet(sheetName);
+    titleRow(ws, title, 7);
+    ws.addRow([]);
+    if (showStats) {
+      const repSum = c.compRows.reduce((a,r) => a+(r.repTotal||0), 0);
+      const sr = ws.addRow(['精舍總數', c.compRows.length, '', '已回報', reported, '未回報', c.未回報數]);
+      sr.height = 22;
+      [[1,'FF444444'],[2,'FF2D4A6E'],[4,'FF2E7D32'],[5,'FF2E7D32'],
+       [6,c.未回報數>0?'FFE65100':'FF2E7D32'],[7,c.未回報數>0?'FFE65100':'FF2E7D32']
+      ].forEach(([i,clr]) => {
+        sr.getCell(i).font = { bold:true, size:i===2||i===5||i===7?13:11, color:{ argb:clr } };
+      });
+      ws.addRow([]);
+    }
+    hdrRow(ws, ['精舍','預估人數','實際人數','落差','落差率','回報時間','狀態']);
+    rows.forEach(r => {
+      const row = dataRow(ws,
+        [r.name, r.estTotal??'', r.repTotal??'', r.落差??'', r.落差率||'', r.reportedAt||'', r.reported?'已回報':'未回報'],
+        !r.reported ? OG_FILL : null, [2,3,4,5,7]
+      );
+      if (r.落差 !== null && r.落差 !== undefined) {
+        row.getCell(4).font = { color:{ argb: r.落差>0?'FF1565C0':r.落差<0?'FFC62828':'FF444444' }, bold: r.落差!==0 };
+      }
+      row.getCell(7).font = { bold:true, color:{ argb: r.reported?'FF2E7D32':'FFE65100' } };
+      row.getCell(7).alignment = CENTER;
+    });
+    ws.getColumn(1).width = 15; ws.getColumn(2).width = 10; ws.getColumn(3).width = 10;
+    ws.getColumn(4).width = 8;  ws.getColumn(5).width = 8;  ws.getColumn(6).width = 22;
+    ws.getColumn(7).width = 9;
+    ws.views = [{ state:'frozen', xSplit:0, ySplit: showStats ? 6 : 4 }];
+  }
+
+  // ══════════════════════════════════════
+  // Sheet 1：全部精舍
+  // ══════════════════════════════════════
+  const allSorted = [...c.compRows].sort((a,b) => {
+    if (a.reported !== b.reported) return a.reported ? 1 : -1;
+    return a.number.localeCompare(b.number);
+  });
+  addCompSheet('全部精舍', c.actName + ' — 全部精舍', allSorted, true);
+
+  // ══════════════════════════════════════
+  // Sheet 2：已回報
+  // ══════════════════════════════════════
+  const repSorted = c.compRows.filter(r => r.reported)
+    .sort((a,b) => a.number.localeCompare(b.number));
+  addCompSheet('已回報', c.actName + ` — 已回報（${reported} 間）`, repSorted, false);
+
+  // ══════════════════════════════════════
+  // Sheet 3：未回報
+  // ══════════════════════════════════════
+  if (unreported.length) {
+    addCompSheet('未回報', c.actName + ` — 未回報（${c.未回報數} 間）`,
+      [...unreported].sort((a,b) => a.number.localeCompare(b.number)), false);
+  } else {
+    const sNone = wb.addWorksheet('未回報');
+    titleRow(sNone, c.actName + ' — 未回報', 2);
+    sNone.mergeCells(4, 1, 4, 2);
+    const ok = sNone.getCell('A4');
+    ok.value = '✓ 全部精舍皆已回報';
+    ok.font  = { bold:true, size:13, color:{ argb:'FF2E7D32' } };
+    ok.alignment = CENTER;
+    sNone.getColumn(1).width = 20; sNone.getColumn(2).width = 12;
+  }
+
+  // ══════════════════════════════════════
+  // Sheet 4：精舍視角
+  // ══════════════════════════════════════
+  const s2 = wb.addWorksheet('精舍視角');
+  titleRow(s2, c.actName + ' — 精舍視角（含便當數）', 6);
+  s2.addRow([]); s2.addRow([]);
+
+  hdrRow(s2, ['精舍','信眾','法師','義工','便當數','合計','回報時間']);
+
+  c.templeRows.forEach(r => {
+    dataRow(s2, [r.name, r.信眾, r.monk, r.volunteer, r.driver, r.total, r.reportedAt], null, [2,3,4,5,6]);
+  });
+
+  const tt = c.總計;
+  const tRow = s2.addRow(['合計', tt.信眾, tt.monk, tt.volunteer, tt.driver, tt.total, '']);
+  tRow.height = 22;
+  for (let i = 1; i <= 7; i++) {
+    tRow.getCell(i).fill = GRAY_FILL;
+    tRow.getCell(i).font = { bold:true, size:11, color:{ argb:'FF2D4A6E' } };
+    tRow.getCell(i).border = BORDER;
+    tRow.getCell(i).alignment = i===1 ? MID : CENTER;
+  }
+
+  s2.getColumn(1).width = 15; [2,3,4,5,6].forEach(i => s2.getColumn(i).width = 8);
+  s2.getColumn(7).width = 22;
+  s2.views = [{ state:'frozen', xSplit:0, ySplit:5 }];
+
+  // ══════════════════════════════════════
+  // Sheet 殿堂視角
+  // ══════════════════════════════════════
+  const s3 = wb.addWorksheet('殿堂視角');
+  titleRow(s3, c.actName + ' — 殿堂視角', 3);
+  s3.addRow([]); s3.addRow([]);
+
+  hdrRow(s3, ['主壇','人數','']);
+  const mMain = dataRow(s3, ['主壇人數', c.mainCount, ''], BLUE_FILL, [2]);
+  mMain.getCell(1).font = { bold:true };
+  mMain.getCell(2).font = { bold:true, size:14, color:{ argb:'FF2D4A6E' } };
+  dataRow(s3, ['　全場信眾+法師', c.mainCount + c.totalSeatCount, ''], null, [2]);
+  dataRow(s3, ['　預設座位數（各休息區）', '－'+c.totalSeatCount, ''], null, [2]);
+
+  s3.addRow([]);
+
+  Object.entries(c.hallMap).forEach(([hall, v]) => {
+    hdrRow(s3, [hall, '信眾＋法師', '合計']);
+    const sRow = dataRow(s3, ['　小計', '', v.count], BLUE_FILL, [3]);
+    sRow.getCell(1).font = { bold:true };
+    sRow.getCell(3).font = { bold:true, size:13, color:{ argb:'FF2D4A6E' } };
+    v.detail.forEach(d => dataRow(s3, ['　└ '+d.name, '眾 '+d.lay+'　師 '+d.monk, d.sub], null, [3]));
+    s3.addRow([]);
+  });
+
+  s3.getColumn(1).width = 20; s3.getColumn(2).width = 16; s3.getColumn(3).width = 8;
+
+  // ── 下載 ──
+  const buffer = await wb.xlsx.writeBuffer();
+  const blob   = new Blob([buffer], { type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  const url    = URL.createObjectURL(blob);
+  const a      = document.createElement('a');
+  a.href       = url;
+  a.download   = date + '_' + c.actName.replace(/[（）\s]/g,'') + '_人數統計.xlsx';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+</script>
+</body>
+</html>
