@@ -87,7 +87,6 @@ tr.total-row td { background:#f0ede8; font-weight:700; border-top:2px solid var(
   <div class="tab-group">
     <button class="tab-btn active" onclick="switchTab('comparison')">比較總覽</button>
     <button class="tab-btn" onclick="switchTab('hall')">殿堂視角</button>
-    <button class="tab-btn" onclick="switchTab('temple')">精舍視角</button>
     <button class="tab-btn" onclick="switchTab('meal')">齋供視角</button>
   </div>
 
@@ -106,16 +105,6 @@ tr.total-row td { background:#f0ede8; font-weight:700; border-top:2px solid var(
     <div id="hall-content"><div class="empty-msg">請先選擇活動</div></div>
   </div>
 
-  <div id="tab-temple" class="tab-content">
-    <div class="table-wrap">
-      <table><thead><tr>
-        <th>精舍</th><th>信眾</th><th>法師</th><th>義工</th><th>合計</th><th>便當數</th><th>回報時間</th>
-      </tr></thead>
-      <tbody id="temple-body"><tr><td colspan="7" class="empty-msg">請先選擇活動</td></tr></tbody>
-      </table>
-    </div>
-  </div>
-
   <div id="tab-meal" class="tab-content">
     <div id="meal-content"><div class="empty-msg">請先選擇活動</div></div>
   </div>
@@ -131,7 +120,7 @@ const SUPABASE_KEY = 'sb_publishable_NnGcMxbnG_D_3qDeFahMqQ_MjSsPzHQ';
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 let currentTab = 'comparison';
 let dashCache  = null;
-const ALL_TABS = ['comparison','hall','temple','meal'];
+const ALL_TABS = ['comparison','hall','meal'];
 
 async function init() {
   const { data } = await sb.from('events').select('id,name,status').order('date', { ascending: false });
