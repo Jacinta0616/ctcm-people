@@ -181,7 +181,7 @@ tr.total-row td { background:#f0ede8; font-weight:700; border-top:2px solid var(
     <div id="tab-temple" class="tab-content">
       <div class="table-wrap">
         <table><thead><tr>
-          <th>精舍</th><th>信眾</th><th>法師</th><th>義工</th><th>便當數</th><th>合計</th><th>回報時間</th>
+          <th>精舍</th><th>信眾</th><th>法師</th><th>義工</th><th>合計</th><th>便當數</th><th>回報時間</th>
         </tr></thead>
         <tbody id="temple-body"><tr><td colspan="7" class="empty-msg">請先選擇活動</td></tr></tbody>
         </table>
@@ -362,7 +362,7 @@ async function fetchDashboard(actId) {
       const 信眾 = (rep.vip||0) + rep.lay;
       const volunteer = rep.volunteer || 0;
       return { number: t.number, name: t.name, 信眾, monk: rep.monk, volunteer, driver: rep.driver,
-               total: 信眾+rep.monk+volunteer+rep.driver,
+               total: 信眾+rep.monk+volunteer,
                reportedAt: new Date(rep.reported_at).toLocaleString('zh-TW',{timeZone:'Asia/Taipei'}) };
     }).filter(Boolean);
   const 總計 = templeRows.reduce(
@@ -524,9 +524,9 @@ function renderTemple() {
   const t = dashCache.總計;
   document.getElementById('temple-body').innerHTML =
     dashCache.templeRows.map(r =>
-      `<tr><td>${r.name}</td><td>${r.信眾}</td><td>${r.monk}</td><td>${r.volunteer}</td><td>${r.driver}</td><td><strong>${r.total}</strong></td><td>${r.reportedAt}</td></tr>`
+      `<tr><td>${r.name}</td><td>${r.信眾}</td><td>${r.monk}</td><td>${r.volunteer}</td><td><strong>${r.total}</strong></td><td>${r.driver}</td><td>${r.reportedAt}</td></tr>`
     ).join('') +
-    `<tr class="total-row"><td>合計</td><td>${t.信眾}</td><td>${t.monk}</td><td>${t.volunteer}</td><td>${t.driver}</td><td>${t.total}</td><td></td></tr>`
+    `<tr class="total-row"><td>合計</td><td>${t.信眾}</td><td>${t.monk}</td><td>${t.volunteer}</td><td>${t.total}</td><td>${t.driver}</td><td></td></tr>`
     || '<tr><td colspan="7" class="empty-msg">尚無回報資料</td></tr>';
 }
 
@@ -1197,14 +1197,14 @@ async function downloadExcel() {
   titleRow(s2, c.actName + ' — 精舍視角（含便當數）', 6);
   s2.addRow([]); s2.addRow([]);
 
-  hdrRow(s2, ['精舍','信眾','法師','義工','便當數','合計','回報時間']);
+  hdrRow(s2, ['精舍','信眾','法師','義工','合計（不含便當）','便當數','回報時間']);
 
   c.templeRows.forEach(r => {
-    dataRow(s2, [r.name, r.信眾, r.monk, r.volunteer, r.driver, r.total, r.reportedAt], null, [2,3,4,5,6]);
+    dataRow(s2, [r.name, r.信眾, r.monk, r.volunteer, r.total, r.driver, r.reportedAt], null, [2,3,4,5,6]);
   });
 
   const tt = c.總計;
-  const tRow = s2.addRow(['合計', tt.信眾, tt.monk, tt.volunteer, tt.driver, tt.total, '']);
+  const tRow = s2.addRow(['合計', tt.信眾, tt.monk, tt.volunteer, tt.total, tt.driver, '']);
   tRow.height = 22;
   for (let i = 1; i <= 7; i++) {
     tRow.getCell(i).fill = GRAY_FILL;
