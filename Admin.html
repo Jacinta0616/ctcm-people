@@ -106,6 +106,7 @@ tr.total-row td { background:#f0ede8; font-weight:700; border-top:2px solid var(
 
 <header>
   <h1>中台禪寺 — 法會人數後台</h1>
+  <button id="btn-logout" onclick="doLogout()" style="display:none;padding:7px 14px;font-size:13px;font-weight:600;background:rgba(255,255,255,.18);color:white;border:1.5px solid rgba(255,255,255,.5);border-radius:7px;cursor:pointer;">登出</button>
 </header>
 
 <div id="screen-login" class="screen active">
@@ -130,6 +131,7 @@ tr.total-row td { background:#f0ede8; font-weight:700; border-top:2px solid var(
       </select>
       <button class="btn btn-outline btn-sm" onclick="refreshData()">↻ 重新整理</button>
       <button class="btn btn-outline btn-sm" id="btn-download" onclick="downloadExcel()" style="display:none;">⬇ 下載 Excel</button>
+      <button class="btn btn-danger btn-sm" id="btn-clear" onclick="clearActivityData()" style="display:none;">🗑 清除本場資料</button>
       <span class="last-update" id="last-update"></span>
     </div>
 
@@ -163,7 +165,7 @@ tr.total-row td { background:#f0ede8; font-weight:700; border-top:2px solid var(
       </div>
       <div class="table-wrap">
         <table><thead><tr>
-          <th>精舍</th><th>報名</th><th>已回報</th><th>差異數</th><th>落差率</th><th>回報時間</th><th>狀態</th>
+          <th>精舍</th><th>報名</th><th>已回報</th><th>差異數</th><th>報到率</th><th>回報時間</th><th>狀態</th>
         </tr></thead>
         <tbody id="comp-body"><tr><td colspan="7" class="empty-msg">請先選擇活動</td></tr></tbody>
         </table>
@@ -240,7 +242,7 @@ tr.total-row td { background:#f0ede8; font-weight:700; border-top:2px solid var(
       </div>
       <div class="table-wrap">
         <table><thead><tr>
-          <th>#</th><th>精舍名稱</th><th>預估信眾</th><th>預估法師</th><th>預估義工</th><th>預估便當數</th><th>預設座位數</th><th>休息區說明</th>
+          <th>#</th><th>精舍名稱</th><th>預估信眾</th><th>預估法師</th><th>預估義工</th><th>休息區人數</th><th>預設座位數</th><th>休息區說明</th>
         </tr></thead>
         <tbody id="setup-body"><tr><td colspan="8" class="empty-msg">請先選擇活動</td></tr></tbody>
         </table>
@@ -267,11 +269,21 @@ function show(id) {
   document.getElementById(id).classList.add('active');
 }
 
-/* ── 登入 ── */
+/* ── 登入 / 登出 ── */
+function doLogout() {
+  dashCache = null;
+  document.getElementById('inp-pwd').value = '';
+  document.getElementById('btn-logout').style.display = 'none';
+  document.getElementById('btn-download').style.display = 'none';
+  document.getElementById('btn-clear').style.display = 'none';
+  show('screen-login');
+}
+
 function doAdminLogin() {
   const pwd = document.getElementById('inp-pwd').value;
   if (pwd === ADMIN_PASSWORD) {
     show('screen-main');
+    document.getElementById('btn-logout').style.display = 'inline-block';
     loadActivities();
   } else {
     document.getElementById('login-error').textContent = '密碼錯誤';
@@ -321,16 +333,16 @@ async function fetchDashboard(actId) {
   const compRows = temples.filter(t => estMap[t.number] !== undefined).map(t => {
     const est = estMap[t.number];
     const rep = repMap[t.number];
-    const estTotal = est ? est.vip+est.lay+est.monk+(est.volunteer||0)+est.driver : null;
-    const repTotal = rep ? rep.vip+rep.lay+rep.monk+(rep.volunteer||0)+rep.driver : null;
-    let 落差 = null, 落差率 = null;
+    const estTotal = est ? (est.vip||0)+(est.lay||0)+est.monk+(est.volunteer||0)+est.driver : null;
+    const repTotal = rep ? (rep.vip||0)+rep.lay+rep.monk+(rep.volunteer||0)+rep.driver : null;
+    let 落差 = null, 報到率 = null;
     if (estTotal !== null && repTotal !== null) {
       落差 = repTotal - estTotal;
-      落差率 = estTotal > 0 ? ((落差/estTotal)*100).toFixed(1)+'%' : (落差===0?'0%':'—');
+      報到率 = estTotal > 0 ? ((repTotal/estTotal)*100).toFixed(1)+'%' : (repTotal===0?'—':'—');
     }
     return {
       number: t.number, name: t.name,
-      estTotal, repTotal, 落差, 落差率,
+      estTotal, repTotal, 落差, 報到率,
       reported: !!rep,
       reportedAt: rep ? new Date(rep.reported_at).toLocaleString('zh-TW',{timeZone:'Asia/Taipei'}) : null
     };
@@ -397,6 +409,7 @@ async function fetchDashboard(actId) {
   document.getElementById('last-update').textContent =
     '更新：' + new Date().toLocaleTimeString('zh-TW',{timeZone:'Asia/Taipei'});
   document.getElementById('btn-download').style.display = 'inline-block';
+  document.getElementById('btn-clear').style.display = 'inline-block';
   renderCurrentTab();
 }
 
@@ -490,7 +503,7 @@ function renderComparison() {
       <td>${r.estTotal===null?'—':r.estTotal}</td>
       <td>${r.repTotal===null?'—':r.repTotal}</td>
       <td${diffCls}>${diff}</td>
-      <td>${r.落差率||'—'}</td>
+      <td>${r.報到率||'—'}</td>
       <td>${r.reportedAt||'—'}</td>
       <td>${badge}</td></tr>`;
   }).join('') || '<tr><td colspan="7" class="empty-msg">無資料</td></tr>';
@@ -613,6 +626,23 @@ async function deleteActivity(actId, actName) {
   }
   loadActivityList();
   loadActivities();
+}
+
+async function clearActivityData() {
+  const actId = document.getElementById('activity-select').value;
+  if (!actId) return;
+  const actName = document.getElementById('activity-select').selectedOptions[0]?.text || actId;
+  if (!confirm(`確定要清除「${actName}」的所有資料嗎？\n\n預估人數、休息區分配、精舍回報 將全部刪除。\n活動本身保留，無法復原。`)) return;
+
+  await Promise.all([
+    sb.from('estimates').delete().eq('event_id', actId),
+    sb.from('rest_areas').delete().eq('event_id', actId),
+    sb.from('reports').delete().eq('event_id', actId)
+  ]);
+
+  dashCache = null;
+  fetchDashboard(actId);
+  alert('✓ 已清除本場所有資料');
 }
 
 async function setStatus(actId, status) {
@@ -899,7 +929,7 @@ async function dlTemplateSetup() {
   const navy = { type:'pattern', pattern:'solid', fgColor:{ argb:'FF2D4A6E' } };
   const bdr  = { style:'thin', color:{ argb:'FFD0D0D0' } };
   const border = { top:bdr, bottom:bdr, left:bdr, right:bdr };
-  const hdr = ws.addRow(['精舍編號','精舍名稱','預估信眾','預估法師','預估義工','預估便當數','預設座位數','休息區說明']);
+  const hdr = ws.addRow(['精舍編號','精舍名稱','預估信眾','預估法師','預估義工','休息區人數','預設座位數','休息區說明']);
   hdr.height = 22;
   hdr.eachCell(c => { c.fill = navy; c.font = { bold:true, color:{ argb:'FFFFFFFF' }, size:11 }; c.alignment = { horizontal:'center', vertical:'middle' }; c.border = border; });
   dashCache.setupRows.forEach(r => {
@@ -917,7 +947,7 @@ async function handleUploadSetup(input) {
   input.value = '';
   if (!rows.length) return;
   const headers = rows[0].map(h => h.trim().replace(/^﻿/, ''));
-  const need = ['精舍編號','預估信眾','預估法師','預估義工','預估便當數','預設座位數','休息區說明'];
+  const need = ['精舍編號','預估信眾','預估法師','預估義工','休息區人數','預設座位數','休息區說明'];
   if (!need.every(h => headers.includes(h))) {
     alert('欄位格式不符，請確認標題列包含：' + need.join('、'));
     return;
@@ -963,7 +993,7 @@ async function handleUploadSetup(input) {
     tr.querySelector('[data-f="lay"]').value        = parseInt(r[hi('預估信眾')])||0;
     tr.querySelector('[data-f="monk"]').value       = parseInt(r[hi('預估法師')])||0;
     tr.querySelector('[data-f="volunteer"]').value  = parseInt(r[hi('預估義工')])||0;
-    tr.querySelector('[data-f="driver"]').value     = parseInt(r[hi('預估便當數')])||0;
+    tr.querySelector('[data-f="driver"]').value     = parseInt(r[hi('休息區人數')])||0;
     tr.querySelector('[data-f="seat_count"]').value = parseInt(r[hi('預設座位數')])||0;
     tr.querySelector('[data-f="rest"]').value       = r[hi('休息區說明')]||'';
     filled++;
@@ -1139,10 +1169,10 @@ async function downloadExcel() {
       });
       ws.addRow([]);
     }
-    hdrRow(ws, ['精舍','預估人數','實際人數','落差','落差率','回報時間','狀態']);
+    hdrRow(ws, ['精舍','報名人數','已回報人數','差異數','報到率','回報時間','狀態']);
     rows.forEach(r => {
       const row = dataRow(ws,
-        [r.name, r.estTotal??'', r.repTotal??'', r.落差??'', r.落差率||'', r.reportedAt||'', r.reported?'已回報':'未回報'],
+        [r.name, r.estTotal??'', r.repTotal??'', r.落差??'', r.報到率||'', r.reportedAt||'', r.reported?'已回報':'未回報'],
         !r.reported ? OG_FILL : null, [2,3,4,5,7]
       );
       if (r.落差 !== null && r.落差 !== undefined) {
@@ -1243,6 +1273,50 @@ async function downloadExcel() {
   });
 
   s3.getColumn(1).width = 20; s3.getColumn(2).width = 16; s3.getColumn(3).width = 8;
+
+  // ══════════════════════════════════════
+  // Sheet 類別彙總（已報名 vs 實到）
+  // ══════════════════════════════════════
+  const s4 = wb.addWorksheet('類別彙總');
+  titleRow(s4, c.actName + ' — 已報名 vs 實到（類別彙總）', 3);
+  s4.addRow([]); s4.addRow([]);
+
+  // 計算類別加總（不含便當）
+  const estSum = { lay:0, monk:0, volunteer:0, total:0 };
+  const repSum = { lay:0, monk:0, volunteer:0, total:0 };
+  c.templeRows.forEach(r => {
+    repSum.lay += r.信眾; repSum.monk += r.monk; repSum.volunteer += r.volunteer;
+    repSum.total += r.total;
+  });
+  c.setupRows.forEach(r => {
+    estSum.lay += r.lay; estSum.monk += r.monk; estSum.volunteer += r.volunteer;
+    estSum.total += r.lay + r.monk + r.volunteer;
+  });
+  const totalDiff = repSum.total - estSum.total;
+  const 總報到率 = estSum.total > 0 ? ((repSum.total / estSum.total)*100).toFixed(1)+'%' : '—';
+
+  hdrRow(s4, ['項目', '已報名', '實到', '差異']);
+  [
+    ['信眾', estSum.lay,       repSum.lay,       repSum.lay - estSum.lay],
+    ['法師', estSum.monk,      repSum.monk,      repSum.monk - estSum.monk],
+    ['義工', estSum.volunteer, repSum.volunteer, repSum.volunteer - estSum.volunteer],
+    ['合計', estSum.total,     repSum.total,     totalDiff],
+  ].forEach(([label, est, rep, diff]) => {
+    const isTotal = label === '合計';
+    const row = dataRow(s4, [label, est, rep, diff > 0 ? '+'+diff : diff], isTotal ? GRAY_FILL : null, [2,3,4]);
+    if (isTotal) row.eachCell(cell => { cell.font = { bold:true, size:12, color:{ argb:'FF2D4A6E' } }; });
+    if (diff !== 0) row.getCell(4).font = { ...(isTotal ? {bold:true,size:12} : {}), color:{ argb: diff > 0 ? 'FF1565C0' : 'FFC62828' } };
+  });
+
+  s4.addRow([]);
+  const rateRow = s4.addRow(['報到率', '', 總報到率, '']);
+  rateRow.height = 24;
+  rateRow.getCell(1).font = { bold:true, size:12, color:{ argb:'FF2D4A6E' } };
+  rateRow.getCell(3).font = { bold:true, size:14, color:{ argb:'FF2E7D32' } };
+  rateRow.getCell(3).alignment = CENTER;
+  rateRow.eachCell(cell => { cell.fill = BLUE_FILL; cell.border = BORDER; });
+
+  s4.getColumn(1).width = 10; [2,3,4].forEach(i => s4.getColumn(i).width = 10);
 
   // ── 下載 ──
   const buffer = await wb.xlsx.writeBuffer();
