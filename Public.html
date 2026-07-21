@@ -92,13 +92,7 @@ tr.total-row td { background:#f0ede8; font-weight:700; border-top:2px solid var(
 
   <div id="tab-comparison" class="tab-content active">
     <div id="comp-stats" class="stat-row"></div>
-    <div class="table-wrap">
-      <table><thead><tr>
-        <th>精舍</th><th>報名</th><th>已回報</th><th>差異數</th><th>落差率</th><th>回報時間</th><th>狀態</th>
-      </tr></thead>
-      <tbody id="comp-body"><tr><td colspan="7" class="empty-msg">請先選擇活動</td></tr></tbody>
-      </table>
-    </div>
+    <div id="comp-summary"></div>
   </div>
 
   <div id="tab-hall" class="tab-content">
@@ -164,18 +158,30 @@ async function fetchDashboard(actId) {
   const repMap  = Object.fromEntries((repRes.data || []).map(r => [r.temple_number, r]));
 
   // 比較總覽
-  const compRows = temples.filter(t => estMap[t.number] !== undefined).map(t => {
+  const compRows = temples.filter(t => estMap[t.number] !== undefined).map(t => ({
+    number: t.number, reported: !!repMap[t.number]
+  }));
+
+  // 報名 / 實到 類別加總（不含便當）
+  const estSummary = { lay: 0, monk: 0, volunteer: 0, total: 0 };
+  const repSummary = { lay: 0, monk: 0, volunteer: 0, total: 0 };
+  temples.forEach(t => {
     const est = estMap[t.number];
-    const rep = repMap[t.number];
-    const estTotal = est ? est.vip+est.lay+est.monk+est.driver+(est.volunteer||0) : null;
-    const repTotal = rep ? rep.vip+rep.lay+rep.monk+rep.driver+(rep.volunteer||0) : null;
-    let 落差 = null, 落差率 = null;
-    if (estTotal !== null && repTotal !== null) {
-      落差 = repTotal - estTotal;
-      落差率 = estTotal > 0 ? ((落差/estTotal)*100).toFixed(1)+'%' : (落差===0?'0%':'—');
+    if (est) {
+      const lay = (est.vip||0) + (est.lay||0);
+      estSummary.lay += lay;
+      estSummary.monk += est.monk || 0;
+      estSummary.volunteer += est.volunteer || 0;
+      estSummary.total += lay + (est.monk||0) + (est.volunteer||0);
     }
-    return { number: t.number, name: t.name, estTotal, repTotal, 落差, 落差率,
-             reported: !!rep, reportedAt: rep ? new Date(rep.reported_at).toLocaleString('zh-TW',{timeZone:'Asia/Taipei'}) : null };
+    const rep = repMap[t.number];
+    if (rep) {
+      const lay = (rep.vip||0) + rep.lay;
+      repSummary.lay += lay;
+      repSummary.monk += rep.monk || 0;
+      repSummary.volunteer += rep.volunteer || 0;
+      repSummary.total += lay + (rep.monk||0) + (rep.volunteer||0);
+    }
   });
 
   // 殿堂視角
@@ -224,7 +230,7 @@ async function fetchDashboard(actId) {
     mealTotal += rep.driver;
   });
 
-  dashCache = { compRows, mainCount, totalSeatCount, hallMap, templeRows, 總計, mealMap, mealTotal,
+  dashCache = { compRows, estSummary, repSummary, mainCount, totalSeatCount, hallMap, templeRows, 總計, mealMap, mealTotal,
                 未回報數: compRows.filter(r => !r.reported).length };
   document.getElementById('last-update').textContent =
     '更新：' + new Date().toLocaleTimeString('zh-TW',{timeZone:'Asia/Taipei'});
@@ -247,38 +253,49 @@ function renderCurrentTab() {
   if (!dashCache) return;
   if (currentTab === 'comparison') renderComparison();
   else if (currentTab === 'hall')   renderHall();
-  else if (currentTab === 'temple') renderTemple();
   else if (currentTab === 'meal')   renderMeal();
 }
 
 function renderComparison() {
   const c = dashCache;
   const reported = c.compRows.filter(r => r.reported).length;
+  const 報到率 = c.estSummary.total > 0
+    ? ((c.repSummary.total / c.estSummary.total) * 100).toFixed(1) + '%'
+    : '—';
+  const diff = c.repSummary.total - c.estSummary.total;
+  const diffStr = diff > 0 ? '+' + diff : String(diff);
+  const diffColor = diff >= 0 ? '#1565c0' : 'var(--danger)';
+
   document.getElementById('comp-stats').innerHTML = [
-    { lbl:'精舍總數', num: c.compRows.length },
+    { lbl:'參與精舍', num: c.compRows.length },
     { lbl:'已回報',   num: reported },
-    { lbl:'未回報',   num: c.未回報數, warn: true },
-    { lbl:'目前實際', num: c.templeRows.reduce((s,r)=>s+r.total,0) }
+    { lbl:'未回報',   num: c.未回報數, warn: c.未回報數 > 0 },
+    { lbl:'報到率',   num: 報到率 },
   ].map(s => `<div class="stat-card${s.warn?' warn':''}"><div class="num">${s.num}</div><div class="lbl">${s.lbl}</div></div>`).join('');
 
-  document.getElementById('comp-body').innerHTML = [...c.compRows]
-    .sort((a,b) => {
-      if (a.reported !== b.reported) return a.reported ? 1 : -1;
-      return a.number.localeCompare(b.number);
-    })
-    .map(r => {
-      const cls   = !r.reported ? ' class="unreported"' : '';
-      const badge = r.reported ? '<span class="badge badge-ok">已回報</span>' : '<span class="badge badge-wait">未回報</span>';
-      const diff    = r.落差===null ? '—' : (r.落差>0?'+'+r.落差:r.落差);
-      const diffCls = r.落差===null ? '' : (r.落差>=0?' class="diff-pos"':' class="diff-neg"');
-      return `<tr${cls}><td>${r.name}</td>
-        <td>${r.estTotal===null?'—':r.estTotal}</td>
-        <td>${r.repTotal===null?'—':r.repTotal}</td>
-        <td${diffCls}>${diff}</td>
-        <td>${r.落差率||'—'}</td>
-        <td>${r.reportedAt||'—'}</td>
-        <td>${badge}</td></tr>`;
-    }).join('') || '<tr><td colspan="7" class="empty-msg">尚無資料</td></tr>';
+  function summaryCard(title, data, accentColor) {
+    const items = [['信眾', data.lay], ['法師', data.monk], ['義工', data.volunteer], ['合計', data.total]];
+    return `<div class="hall-card" style="border-left:4px solid ${accentColor};">
+      <div class="hall-title" style="font-size:15px;color:${accentColor};margin-bottom:12px;">${title}</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        ${items.map(([l, n]) => `
+          <div style="text-align:center;">
+            <div style="font-size:28px;font-weight:800;color:var(--navy);">${n}</div>
+            <div style="font-size:12px;color:var(--muted);margin-top:2px;">${l}</div>
+          </div>`).join('')}
+      </div>
+    </div>`;
+  }
+
+  document.getElementById('comp-summary').innerHTML =
+    `<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
+      ${summaryCard('📋 已報名', c.estSummary, '#2d4a6e')}
+      ${summaryCard('✅ 實到', c.repSummary, '#2e7d32')}
+    </div>
+    <div class="hall-card" style="border-left:4px solid ${diffColor};display:flex;justify-content:space-between;align-items:center;">
+      <div style="font-size:14px;font-weight:600;color:${diffColor};">差異總計（實到－報名）</div>
+      <div style="font-size:28px;font-weight:800;color:${diffColor};">${c.estSummary.total > 0 ? diffStr : '—'}</div>
+    </div>`;
 }
 
 function renderHall() {
