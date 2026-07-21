@@ -40,7 +40,8 @@ header p  { font-size:13px; opacity:.75; margin-top:2px; }
 .total-row span:first-child { font-size:15px; color:var(--muted); }
 .total-num { font-size:28px; font-weight:800; color:var(--navy); }
 .prev-tag { display:inline-block; background:#fff3e0; color:#bf6000; font-size:12px; font-weight:600; padding:3px 9px; border-radius:20px; margin-bottom:8px; }
-.mini-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:6px; margin:8px 0; }
+.mini-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:6px; margin:8px 0; }
+.driver-row { display:flex; justify-content:space-between; align-items:center; border-top:1px dashed #ddd; margin-top:8px; padding-top:8px; }
 .mini-item { text-align:center; }
 .mini-item .n { font-size:20px; font-weight:700; color:var(--navy); }
 .mini-item .l { font-size:11px; color:var(--muted); }
@@ -97,12 +98,12 @@ header p  { font-size:13px; opacity:.75; margin-top:2px; }
     </div>
     <div class="card" id="est-card" style="display:none;">
       <span class="prev-tag" style="background:#e8f0fb;color:#2d4a6e;">本場報名人數</span>
-      <div class="mini-grid" id="est-mini"></div>
+      <div id="est-mini"></div>
     </div>
     <div class="card" id="prev-card" style="display:none;">
       <span class="prev-tag">已有回報紀錄</span>
       <div style="font-size:13px;color:var(--muted);" id="prev-time-text"></div>
-      <div class="mini-grid" id="prev-mini"></div>
+      <div id="prev-mini"></div>
       <div style="font-size:12px;color:var(--muted);">送出後將更新為最新數字</div>
     </div>
     <div class="card">
@@ -121,8 +122,12 @@ header p  { font-size:13px; opacity:.75; margin-top:2px; }
         <input type="text" id="f-note" placeholder="">
       </div>
       <div class="total-row">
-        <span>合計人數</span>
+        <span>合計人數（信眾＋法師＋義工）</span>
         <span class="total-num" id="total-num">0</span>
+      </div>
+      <div class="total-row" style="margin-top:10px;padding-top:10px;border-top:1px dashed #ddd;">
+        <span style="font-size:15px;color:var(--muted);">便當數</span>
+        <span style="font-size:26px;font-weight:800;color:var(--muted);" id="driver-display">0</span>
       </div>
       <button class="btn" id="btn-submit" onclick="doSubmit()" style="margin-top:14px;">送出回報</button>
     </div>
@@ -135,7 +140,7 @@ header p  { font-size:13px; opacity:.75; margin-top:2px; }
       <div class="check-circle">✓</div>
       <div class="success-title">回報成功</div>
       <div class="success-sub" id="success-time"></div>
-      <div class="mini-grid" id="success-mini"></div>
+      <div id="success-mini"></div>
       <button class="btn btn-outline" onclick="goToMain()">重新回報</button>
     </div>
   </div>
@@ -231,9 +236,10 @@ async function loadPageData() {
 }
 
 function calcTotal() {
-  const t = ['f-lay','f-monk','f-volunteer','f-driver']
+  const t = ['f-lay','f-monk','f-volunteer']
     .reduce((acc, id) => acc + (parseInt(document.getElementById(id).value) || 0), 0);
   document.getElementById('total-num').textContent = t;
+  document.getElementById('driver-display').textContent = parseInt(document.getElementById('f-driver').value) || 0;
 }
 
 async function doSubmit() {
@@ -278,9 +284,14 @@ function setBtn(id, disabled, text) {
 }
 
 function miniGrid(lay, monk, volunteer, driver) {
-  return ['信眾','法師','義工','便當'].map((l, i) =>
-    `<div class="mini-item"><div class="n">${[lay,monk,volunteer,driver][i]}</div><div class="l">${l}</div></div>`
+  const grid = ['信眾','法師','義工'].map((l, i) =>
+    `<div class="mini-item"><div class="n">${[lay,monk,volunteer][i]}</div><div class="l">${l}</div></div>`
   ).join('');
+  return `<div class="mini-grid">${grid}</div>
+    <div class="driver-row">
+      <span style="font-size:12px;color:var(--muted);">便當數</span>
+      <span style="font-size:16px;font-weight:700;color:var(--navy);">${driver}</span>
+    </div>`;
 }
 </script>
 </body>
