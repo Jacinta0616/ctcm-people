@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+  <title>餐點領取</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --navy: #1a2b4a;
+      --gold:  #c8a84b;
+      --bg:    #f5f3ef;
+      --card:  #ffffff;
+      --muted: #888;
+      --red:   #c0392b;
+    }
+    body { font-family: -apple-system, 'Noto Sans TC', sans-serif; background: var(--bg); min-height: 100vh; }
+
+    .screen { display: none; min-height: 100vh; }
+    .screen.active { display: flex; flex-direction: column; }
+
+    /* ── 查詢畫面 ── */
+    #screen-input {
+      align-items: center; justify-content: center; padding: 24px 20px;
+    }
+    .brand { text-align: center; margin-bottom: 32px; }
+    .brand-title { font-size: 22px; font-weight: 800; color: var(--navy); }
+    .brand-sub { font-size: 14px; color: var(--muted); margin-top: 4px; }
+
+    .card {
+      background: var(--card); border-radius: 16px; padding: 28px 24px;
+      box-shadow: 0 4px 20px rgba(0,0,0,.08); width: 100%; max-width: 420px;
+    }
+    .inp-label { font-size: 14px; color: var(--muted); margin-bottom: 8px; display: block; }
+    .inp-num {
+      width: 100%; font-size: 28px; font-weight: 700; text-align: center;
+      border: 2px solid #ddd; border-radius: 10px; padding: 14px 12px;
+      outline: none; color: var(--navy); letter-spacing: 4px;
+    }
+    .inp-num:focus { border-color: var(--navy); }
+    .error-msg { color: var(--red); font-size: 13px; margin-top: 8px; min-height: 20px; text-align: center; }
+
+    .btn {
+      display: block; width: 100%; padding: 16px; border: none; border-radius: 12px;
+      font-size: 17px; font-weight: 700; cursor: pointer; transition: opacity .15s;
+    }
+    .btn:disabled { opacity: .5; cursor: not-allowed; }
+    .btn-primary { background: var(--navy); color: #fff; margin-top: 20px; }
+    .btn-primary:active { opacity: .85; }
+    .btn-outline { background: #fff; color: var(--navy); border: 2px solid var(--navy); margin-top: 12px; }
+    .btn-confirm { background: #1a7a3c; color: #fff; margin-top: 20px; }
+    .btn-danger  { background: var(--red); color: #fff; }
+
+    /* ── 資訊畫面 ── */
+    #screen-info {
+      flex-direction: column; padding: 0;
+    }
+    .info-header {
+      background: var(--navy); color: #fff; padding: 24px 20px 20px;
+    }
+    .info-act { font-size: 13px; opacity: .7; }
+    .info-name { font-size: 24px; font-weight: 800; margin-top: 4px; }
+
+    .info-body { padding: 24px 20px; flex: 1; }
+
+    .meal-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 24px;
+    }
+    .meal-card {
+      background: var(--card); border-radius: 14px; padding: 20px 16px; text-align: center;
+      box-shadow: 0 2px 12px rgba(0,0,0,.07);
+    }
+    .meal-label { font-size: 13px; color: var(--muted); margin-bottom: 6px; }
+    .meal-num { font-size: 52px; font-weight: 900; color: var(--navy); line-height: 1; }
+    .meal-unit { font-size: 13px; color: var(--muted); margin-top: 4px; }
+    .meal-hint {
+      font-size: 11px; color: #aaa; line-height: 1.5; margin-top: 6px;
+      border-top: 1px solid #eee; padding-top: 6px;
+    }
+
+    .no-data-msg {
+      background: #fff8e1; border-radius: 12px; padding: 16px; text-align: center;
+      font-size: 14px; color: #b8860b; margin-bottom: 20px;
+    }
+
+    /* ── 確認畫面 ── */
+    #screen-confirm {
+      align-items: center; justify-content: center; padding: 24px 20px;
+      background: var(--bg);
+    }
+    .confirm-title {
+      font-size: 22px; font-weight: 800; color: var(--navy); text-align: center; margin-bottom: 6px;
+    }
+    .confirm-sub { font-size: 14px; color: var(--muted); text-align: center; margin-bottom: 28px; }
+    .confirm-box {
+      background: var(--card); border-radius: 16px; padding: 28px 24px; width: 100%; max-width: 420px;
+      box-shadow: 0 4px 20px rgba(0,0,0,.08);
+    }
+    .confirm-temple { font-size: 18px; font-weight: 700; color: var(--navy); text-align: center; margin-bottom: 20px; }
+    .confirm-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 24px; }
+    .confirm-item { text-align: center; background: #f5f3ef; border-radius: 10px; padding: 16px 10px; }
+    .confirm-item .n { font-size: 44px; font-weight: 900; color: var(--navy); }
+    .confirm-item .l { font-size: 13px; color: var(--muted); margin-top: 2px; }
+    .confirm-warn {
+      font-size: 12px; color: var(--red); text-align: center; margin-bottom: 16px; line-height: 1.6;
+    }
+
+    /* ── 完成畫面 ── */
+    #screen-done {
+      align-items: center; justify-content: center; padding: 24px 20px;
+      background: var(--navy);
+    }
+    .done-box {
+      background: #fff; border-radius: 20px; padding: 36px 28px; width: 100%; max-width: 420px;
+      text-align: center; box-shadow: 0 8px 40px rgba(0,0,0,.3);
+    }
+    .done-icon { font-size: 56px; margin-bottom: 16px; }
+    .done-temple { font-size: 16px; color: var(--muted); margin-bottom: 10px; }
+    .done-nums {
+      display: flex; gap: 20px; justify-content: center; margin: 16px 0 24px;
+    }
+    .done-num-item { text-align: center; }
+    .done-num-item .n { font-size: 48px; font-weight: 900; color: var(--navy); }
+    .done-num-item .l { font-size: 13px; color: var(--muted); }
+    .done-divider { border: none; border-top: 1px solid #eee; margin: 20px 0; }
+    .done-msg {
+      font-size: 16px; font-weight: 600; color: var(--navy); line-height: 1.8;
+      letter-spacing: .5px;
+    }
+    .done-reset { font-size: 13px; color: var(--muted); margin-top: 28px; cursor: pointer; text-decoration: underline; }
+  </style>
+</head>
+<body>
+
+<!-- ① 輸入精舍代碼 -->
+<div id="screen-input" class="screen active">
+  <div class="brand">
+    <div class="brand-title">餐點領取</div>
+    <div class="brand-sub">請輸入精舍代碼查詢領取資訊</div>
+  </div>
+  <div class="card">
+    <label class="inp-label" for="inp-code">精舍代碼</label>
+    <input class="inp-num" id="inp-code" type="text" inputmode="text" maxlength="6" placeholder="——"
+           onkeydown="if(event.key==='Enter') doQuery()">
+    <div class="error-msg" id="query-error"></div>
+    <button class="btn btn-primary" id="btn-query" onclick="doQuery()">查詢</button>
+  </div>
+</div>
+
+<!-- ② 顯示領取資訊 -->
+<div id="screen-info" class="screen">
+  <div class="info-header">
+    <div class="info-act" id="info-act-name"></div>
+    <div class="info-name" id="info-temple-name"></div>
+  </div>
+  <div class="info-body">
+    <div id="no-data-banner" class="no-data-msg" style="display:none;">
+      ⚠️ 本場尚無回報紀錄，請先至回報頁面完成回報。
+    </div>
+    <div class="meal-grid">
+      <div class="meal-card">
+        <div class="meal-label">便當數</div>
+        <div class="meal-num" id="disp-driver">—</div>
+        <div class="meal-unit">份</div>
+        <div class="meal-hint">回山－義工－貴賓</div>
+      </div>
+      <div class="meal-card">
+        <div class="meal-label">回點數</div>
+        <div class="meal-num" id="disp-return">—</div>
+        <div class="meal-unit">份</div>
+        <div class="meal-hint">回程－義工</div>
+      </div>
+    </div>
+    <button class="btn btn-confirm" id="btn-pickup" onclick="showConfirm()">確定領取便當及回點</button>
+    <button class="btn btn-outline" onclick="goBack()">重新查詢</button>
+  </div>
+</div>
+
+<!-- ③ 雙重確認 -->
+<div id="screen-confirm" class="screen">
+  <div class="confirm-title">再次確認</div>
+  <div class="confirm-sub">確認無誤後點擊「確認領取」</div>
+  <div class="confirm-box">
+    <div class="confirm-temple" id="confirm-temple-name"></div>
+    <div class="confirm-grid">
+      <div class="confirm-item">
+        <div class="n" id="confirm-driver">—</div>
+        <div class="l">便當數</div>
+      </div>
+      <div class="confirm-item">
+        <div class="n" id="confirm-return">—</div>
+        <div class="l">回點數</div>
+      </div>
+    </div>
+    <div class="confirm-warn">請核對數量後再確認，領取後如有差異請立即告知齋供照客。</div>
+    <button class="btn btn-danger" onclick="showDone()">確認領取</button>
+    <button class="btn btn-outline" onclick="show('screen-info')">返回修改</button>
+  </div>
+</div>
+
+<!-- ④ 完成／展示給齋供照客 -->
+<div id="screen-done" class="screen">
+  <div class="done-box">
+    <div class="done-icon">🍱</div>
+    <div class="done-temple" id="done-temple-name"></div>
+    <div class="done-nums">
+      <div class="done-num-item">
+        <div class="n" id="done-driver">—</div>
+        <div class="l">便當數</div>
+      </div>
+      <div class="done-num-item" style="border-left:2px solid #eee;padding-left:20px;">
+        <div class="n" id="done-return">—</div>
+        <div class="l">回點數</div>
+      </div>
+    </div>
+    <hr class="done-divider">
+    <div class="done-msg">
+      請將頁面提供給齋供照客確認，<br>再領取餐點。<br><br>
+      如有數量錯誤請及時告知齋供照客，<br>
+      感恩大眾慈悲配合。
+    </div>
+    <div class="done-reset" onclick="goBack()">重新查詢</div>
+  </div>
+</div>
+
+<script>
+const SUPABASE_URL = 'https://dfqcbwresfwejiudlqso.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_NnGcMxbnG_D_3qDeFahMqQ_MjSsPzHQ';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+let G = { templeName: '', driver: 0, returnCount: 0, actName: '' };
+
+function show(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+async function doQuery() {
+  const code = document.getElementById('inp-code').value.trim();
+  if (!code) { setErr('請輸入精舍代碼'); return; }
+  setErr('');
+  setBtn('btn-query', true, '查詢中…');
+
+  try {
+    // 找精舍
+    const { data: temples } = await sb.from('temples').select('number, name').eq('number', code);
+    if (!temples || temples.length === 0) {
+      // 嘗試補零格式（如 '1' 對應 '01'）
+      const padded = code.padStart(2, '0');
+      const { data: temples2 } = await sb.from('temples').select('number, name').eq('number', padded);
+      if (!temples2 || temples2.length === 0) { setErr('找不到此精舍代碼，請重新確認'); setBtn('btn-query', false, '查詢'); return; }
+      G.templeNumber = padded;
+      G.templeName = temples2[0].name;
+    } else {
+      G.templeNumber = temples[0].number;
+      G.templeName = temples[0].name;
+    }
+
+    // 找進行中活動
+    const { data: events } = await sb.from('events').select('id, name').eq('status', '進行中').limit(1);
+    if (!events || events.length === 0) { setErr('目前沒有進行中的活動'); setBtn('btn-query', false, '查詢'); return; }
+    G.actId   = events[0].id;
+    G.actName = events[0].name;
+
+    // 找回報資料
+    const { data: rep } = await sb.from('reports')
+      .select('driver, return_count')
+      .eq('event_id', G.actId)
+      .eq('temple_number', G.templeNumber)
+      .maybeSingle();
+
+    G.driver      = rep?.driver      ?? null;
+    G.returnCount = rep?.return_count ?? null;
+
+    // 更新資訊畫面
+    document.getElementById('info-act-name').textContent    = G.actName;
+    document.getElementById('info-temple-name').textContent = G.templeName;
+
+    const hasData = rep !== null;
+    document.getElementById('no-data-banner').style.display = hasData ? 'none' : 'block';
+    document.getElementById('btn-pickup').style.display     = hasData ? 'block' : 'none';
+    document.getElementById('disp-driver').textContent      = hasData ? G.driver      : '—';
+    document.getElementById('disp-return').textContent      = hasData ? G.returnCount  : '—';
+
+    show('screen-info');
+  } catch (e) {
+    setErr('查詢失敗，請稍後再試');
+  }
+  setBtn('btn-query', false, '查詢');
+}
+
+function showConfirm() {
+  document.getElementById('confirm-temple-name').textContent = G.templeName;
+  document.getElementById('confirm-driver').textContent = G.driver;
+  document.getElementById('confirm-return').textContent = G.returnCount;
+  show('screen-confirm');
+}
+
+async function showDone() {
+  // 記錄領取時間
+  await sb.from('pickups').upsert(
+    { event_id: G.actId, temple_number: G.templeNumber, picked_up_at: new Date().toISOString() },
+    { onConflict: 'event_id,temple_number' }
+  );
+  document.getElementById('done-temple-name').textContent = G.templeName + '　' + G.actName;
+  document.getElementById('done-driver').textContent      = G.driver;
+  document.getElementById('done-return').textContent      = G.returnCount;
+  show('screen-done');
+}
+
+function goBack() {
+  document.getElementById('inp-code').value = '';
+  setErr('');
+  show('screen-input');
+}
+
+function setErr(msg) { document.getElementById('query-error').textContent = msg; }
+function setBtn(id, disabled, text) {
+  const b = document.getElementById(id);
+  b.disabled = disabled; b.textContent = text;
+}
+</script>
+</body>
+</html>
