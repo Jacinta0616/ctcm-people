@@ -109,13 +109,19 @@ header p  { font-size:13px; opacity:.75; margin-top:2px; }
     <div class="card">
       <div style="font-size:15px;font-weight:600;margin-bottom:4px;">回報人數</div>
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin:12px 0 10px;">
-        <div class="inp-group"><label>信眾</label><input type="number" id="f-lay" min="0" value="0" oninput="calcTotal()"></div>
+        <div class="inp-group"><label>信眾 <span style="font-size:11px;color:#bbb;font-weight:400;">(信眾+貴賓)</span></label><input type="number" id="f-lay" min="0" value="0" oninput="calcTotal()"></div>
         <div class="inp-group"><label>法師</label><input type="number" id="f-monk" min="0" value="0" oninput="calcTotal()"></div>
         <div class="inp-group"><label>義工</label><input type="number" id="f-volunteer" min="0" value="0" oninput="calcTotal()"></div>
       </div>
-      <div class="inp-group" style="margin:0 0 10px;">
-        <label>便當數</label>
-        <input type="number" id="f-driver" min="0" value="0" oninput="calcTotal()">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:0 0 10px;">
+        <div class="inp-group">
+          <label>便當數 <span style="font-size:11px;color:#bbb;font-weight:400;">(回山－義工－貴賓)</span></label>
+          <input type="number" id="f-driver" min="0" value="0" oninput="calcTotal()">
+        </div>
+        <div class="inp-group">
+          <label>回點數 <span style="font-size:11px;color:#bbb;font-weight:400;">(回程－義工)</span></label>
+          <input type="number" id="f-return-count" min="0" value="0" oninput="calcTotal()">
+        </div>
       </div>
       <div class="inp-group" style="margin-bottom:10px;">
         <label style="font-size:13px;color:var(--muted);display:block;margin-bottom:4px;">備註（選填）</label>
@@ -125,9 +131,15 @@ header p  { font-size:13px; opacity:.75; margin-top:2px; }
         <span>合計人數（信眾＋法師＋義工）</span>
         <span class="total-num" id="total-num">0</span>
       </div>
-      <div class="total-row" style="margin-top:10px;padding-top:10px;border-top:1px dashed #ddd;">
-        <span style="font-size:15px;color:var(--muted);">便當數</span>
-        <span style="font-size:26px;font-weight:800;color:var(--muted);" id="driver-display">0</span>
+      <div style="display:flex;gap:0;margin-top:10px;padding-top:10px;border-top:1px dashed #ddd;">
+        <div class="total-row" style="flex:1;margin:0;padding:0;">
+          <span style="font-size:15px;color:var(--muted);">便當數</span>
+          <span style="font-size:26px;font-weight:800;color:var(--muted);" id="driver-display">0</span>
+        </div>
+        <div class="total-row" style="flex:1;margin:0;padding:0;border-left:1px dashed #ddd;">
+          <span style="font-size:15px;color:var(--muted);">回點數</span>
+          <span style="font-size:26px;font-weight:800;color:var(--muted);" id="return-count-display">0</span>
+        </div>
       </div>
       <button class="btn" id="btn-submit" onclick="doSubmit()" style="margin-top:14px;">送出回報</button>
     </div>
@@ -203,7 +215,7 @@ async function loadPageData() {
   const [restRes, estRes, repRes] = await Promise.all([
     sb.from('rest_areas').select('description')
       .eq('event_id', ev.id).eq('temple_number', S.精舍編號).maybeSingle(),
-    sb.from('estimates').select('vip,lay,monk,driver')
+    sb.from('estimates').select('vip,lay,monk,volunteer,driver')
       .eq('event_id', ev.id).eq('temple_number', S.精舍編號).maybeSingle(),
     sb.from('reports').select('*')
       .eq('event_id', ev.id).eq('temple_number', S.精舍編號).maybeSingle()
@@ -215,7 +227,7 @@ async function loadPageData() {
   const est = estRes.data;
   if (est) {
     document.getElementById('est-card').style.display = 'block';
-    document.getElementById('est-mini').innerHTML = miniGrid((est.vip||0)+(est.lay||0), est.monk, est.volunteer||0, est.driver);
+    document.getElementById('est-mini').innerHTML = miniGrid((est.vip||0)+(est.lay||0), est.monk, est.volunteer||0, est.driver, 0);
   }
 
   const prev = repRes.data;
@@ -224,12 +236,13 @@ async function loadPageData() {
       .toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' });
     document.getElementById('prev-card').style.display = 'block';
     document.getElementById('prev-time-text').textContent = '回報時間：' + timeStr;
-    document.getElementById('prev-mini').innerHTML = miniGrid((prev.vip||0)+prev.lay, prev.monk, prev.volunteer||0, prev.driver);
+    document.getElementById('prev-mini').innerHTML = miniGrid((prev.vip||0)+prev.lay, prev.monk, prev.volunteer||0, prev.driver, prev.return_count||0);
     document.getElementById('f-lay').value       = (prev.vip||0) + prev.lay;
     document.getElementById('f-monk').value      = prev.monk;
     document.getElementById('f-volunteer').value = prev.volunteer || 0;
-    document.getElementById('f-driver').value    = prev.driver;
-    document.getElementById('f-note').value      = prev.note || '';
+    document.getElementById('f-driver').value        = prev.driver;
+    document.getElementById('f-return-count').value  = prev.return_count || 0;
+    document.getElementById('f-note').value           = prev.note || '';
     calcTotal();
   }
   show('screen-main');
@@ -240,6 +253,7 @@ function calcTotal() {
     .reduce((acc, id) => acc + (parseInt(document.getElementById(id).value) || 0), 0);
   document.getElementById('total-num').textContent = t;
   document.getElementById('driver-display').textContent = parseInt(document.getElementById('f-driver').value) || 0;
+  document.getElementById('return-count-display').textContent = parseInt(document.getElementById('f-return-count').value) || 0;
 }
 
 async function doSubmit() {
@@ -247,10 +261,11 @@ async function doSubmit() {
   const lay       = parseInt(document.getElementById('f-lay').value)       || 0;
   const monk      = parseInt(document.getElementById('f-monk').value)      || 0;
   const volunteer = parseInt(document.getElementById('f-volunteer').value) || 0;
-  const driver    = parseInt(document.getElementById('f-driver').value)    || 0;
-  const note      = document.getElementById('f-note').value;
+  const driver      = parseInt(document.getElementById('f-driver').value)       || 0;
+  const returnCount = parseInt(document.getElementById('f-return-count').value) || 0;
+  const note        = document.getElementById('f-note').value;
 
-  if ((lay + monk + volunteer + driver) === 0 && !confirm('總人數為 0，確定要送出嗎？')) return;
+  if ((lay + monk + volunteer + driver + returnCount) === 0 && !confirm('總人數為 0，確定要送出嗎？')) return;
 
   setBtn('btn-submit', true, '送出中…');
 
@@ -258,7 +273,7 @@ async function doSubmit() {
     event_id:      S.活動ID,
     temple_number: S.精舍編號,
     reported_at:   new Date().toISOString(),
-    vip, lay, monk, volunteer, driver,
+    vip, lay, monk, volunteer, driver, return_count: returnCount,
     note: note || ''
   }, { onConflict: 'event_id,temple_number' });
 
@@ -267,7 +282,7 @@ async function doSubmit() {
 
   const now = new Date().toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' });
   document.getElementById('success-time').textContent = '回報時間：' + now;
-  document.getElementById('success-mini').innerHTML = miniGrid(lay, monk, volunteer, driver);
+  document.getElementById('success-mini').innerHTML = miniGrid(lay, monk, volunteer, driver, returnCount);
   show('screen-success');
 }
 
@@ -283,14 +298,14 @@ function setBtn(id, disabled, text) {
   b.disabled = disabled; b.textContent = text;
 }
 
-function miniGrid(lay, monk, volunteer, driver) {
+function miniGrid(lay, monk, volunteer, driver, returnCount) {
   const grid = ['信眾','法師','義工'].map((l, i) =>
     `<div class="mini-item"><div class="n">${[lay,monk,volunteer][i]}</div><div class="l">${l}</div></div>`
   ).join('');
   return `<div class="mini-grid">${grid}</div>
-    <div class="driver-row">
-      <span style="font-size:12px;color:var(--muted);">便當數</span>
-      <span style="font-size:16px;font-weight:700;color:var(--navy);">${driver}</span>
+    <div class="driver-row" style="display:flex;justify-content:space-between;padding:6px 0;">
+      <span style="font-size:12px;color:var(--muted);">便當數 <strong style="font-size:16px;font-weight:700;color:var(--navy);">${driver}</strong></span>
+      <span style="font-size:12px;color:var(--muted);">回點數 <strong style="font-size:16px;font-weight:700;color:var(--navy);">${returnCount||0}</strong></span>
     </div>`;
 }
 </script>
