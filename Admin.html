@@ -232,7 +232,9 @@ tr.total-row td { background:#f0ede8; font-weight:700; border-top:2px solid var(
         <button class="btn btn-teal btn-sm" onclick="dlTemplateSetup()">⬇ 下載範本</button>
         <button class="btn btn-outline btn-sm" onclick="document.getElementById('file-setup').click()">⬆ 上傳設定</button>
         <button class="btn btn-outline btn-sm" onclick="copyFromPrevEvent()">↩ 複製上場預估</button>
+        <button class="btn btn-outline btn-sm" onclick="document.getElementById('file-setup-single').click()">📤 單筆更新</button>
         <input type="file" id="file-setup" accept=".csv,.xlsx,.xls" style="display:none" onchange="handleUploadSetup(this)">
+        <input type="file" id="file-setup-single" accept=".csv,.xlsx,.xls" style="display:none" onchange="handleUploadSetupSingle(this)">
         <span class="upload-hint" id="setup-upload-hint">格式：精舍編號, 預估信眾/法師/義工/休息區人數/預設座位數/休息區說明（支援 Excel / CSV）｜上傳前請先選好活動並等預估人數列表載入</span>
       </div>
       <div class="setup-toolbar">
@@ -357,8 +359,8 @@ async function fetchDashboard(actId) {
   temples.forEach(t => {
     const rep = repMap[t.number];
     const est = estMap[t.number];
-    totalSeatCount += est?.seat_count || 0;
     if (!rep) return;
+    totalSeatCount += est?.seat_count || 0;
     const 信眾 = (rep.vip||0) + rep.lay;
     totalRepLayMonk += 信眾 + rep.monk;
     const hall = restMap[t.number] || '（未分配）';
@@ -393,9 +395,11 @@ async function fetchDashboard(actId) {
     const rep = repMap[t.number];
     if (!rep) return;
     const hall = restMap[t.number] || '（未分配）';
-    if (!mealMap[hall]) mealMap[hall] = { count: 0, returnCount: 0, detail: [] };
+    const seatCount = estMap[t.number]?.seat_count || 0;
+    if (!mealMap[hall]) mealMap[hall] = { count: 0, returnCount: 0, seatCount: 0, detail: [] };
     mealMap[hall].count += rep.driver;
     mealMap[hall].returnCount += rep.return_count || 0;
+    mealMap[hall].seatCount += seatCount;
     const pickedUp = !!pickupMap[t.number];
     const pickedUpAt = pickedUp
       ? new Date(pickupMap[t.number]).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' })
@@ -403,7 +407,7 @@ async function fetchDashboard(actId) {
     mealMap[hall].detail.push({
       name: t.name, number: t.number,
       count: rep.driver, returnCount: rep.return_count || 0,
-      pickedUp, pickedUpAt
+      seatCount, pickedUp, pickedUpAt
     });
     mealTotal += rep.driver;
     mealReturnTotal += rep.return_count || 0;
@@ -589,19 +593,33 @@ function renderMeal() {
 
   html += '<div class="hall-grid">';
   entries.forEach(([hall, v]) => {
+    const hallDiff = v.count - v.seatCount;
+    const hallDiffColor = hallDiff > 0 ? '#c62828' : hallDiff < 0 ? '#1565c0' : '#888';
+    const hallDiffStr = hallDiff > 0 ? `+${hallDiff}` : `${hallDiff}`;
     html += `<div class="hall-card">
       <div class="hall-title">🍱 ${hall}</div>
       <div class="hall-count" style="font-size:26px;">${v.count} <span>份便當</span>
         <span style="font-size:13px;color:var(--muted);margin-left:6px;">+ ${v.returnCount} 回點</span>
+      </div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:6px;">
+        預設座位數 ${v.seatCount} 席　落差
+        <strong style="color:${hallDiffColor};">${hallDiff === 0 ? '±0' : hallDiffStr}</strong>
       </div>`;
     if (v.detail.length) {
       html += '<div class="detail-list">' + v.detail.map(d => {
+        const diff = d.count - d.seatCount;
+        const diffColor = diff > 0 ? '#c62828' : diff < 0 ? '#1565c0' : '#888';
+        const diffStr = diff > 0 ? `+${diff}` : `${diff}`;
         const badge = d.pickedUp
           ? `<span style="color:#1a7a3c;font-size:11px;font-weight:700;">✓ 已領取</span><br><span style="font-size:10px;color:#aaa;">${d.pickedUpAt}</span>`
           : `<span style="color:#b8860b;font-size:11px;font-weight:700;">⏳ 未領取</span>`;
         return `<div class="detail-row" style="align-items:flex-start;padding:5px 0;">
           <span>${d.name}</span>
-          <span style="text-align:right;line-height:1.7;">便 ${d.count}／回 ${d.returnCount}<br>${badge}</span>
+          <span style="text-align:right;line-height:1.8;">
+            便 ${d.count}／回 ${d.returnCount}<br>
+            座 ${d.seatCount} 落差 <strong style="color:${diffColor};">${diff === 0 ? '±0' : diffStr}</strong><br>
+            ${badge}
+          </span>
         </div>`;
       }).join('') + '</div>';
     }
@@ -681,12 +699,13 @@ async function clearActivityData() {
   const actId = document.getElementById('activity-select').value;
   if (!actId) return;
   const actName = document.getElementById('activity-select').selectedOptions[0]?.text || actId;
-  if (!confirm(`確定要清除「${actName}」的所有資料嗎？\n\n預估人數、休息區分配、精舍回報 將全部刪除。\n活動本身保留，無法復原。`)) return;
+  if (!confirm(`確定要清除「${actName}」的所有資料嗎？\n\n預估人數、休息區分配、精舍回報、領取紀錄 將全部刪除。\n活動本身保留，無法復原。`)) return;
 
   await Promise.all([
     sb.from('estimates').delete().eq('event_id', actId),
     sb.from('rest_areas').delete().eq('event_id', actId),
-    sb.from('reports').delete().eq('event_id', actId)
+    sb.from('reports').delete().eq('event_id', actId),
+    sb.from('pickups').delete().eq('event_id', actId)
   ]);
 
   dashCache = null;
@@ -1072,6 +1091,65 @@ async function handleUploadSetup(input) {
   const hint = document.getElementById('setup-upload-hint');
   hint.textContent = `✓ 已填入 ${filled} 筆資料${nameMsg}，確認後請按「儲存全部」`;
   hint.style.color = 'var(--success)';
+}
+
+/* ── 精舍設定 單筆更新（直接寫入 DB，不影響其他精舍）── */
+async function handleUploadSetupSingle(input) {
+  const file = input.files[0]; if (!file) return;
+  const rows = await parseFile(file);
+  input.value = '';
+  if (!rows.length) { alert('檔案是空的'); return; }
+
+  const actId = document.getElementById('activity-select').value;
+  if (!actId) { alert('請先選擇活動'); return; }
+
+  const headers = rows[0].map(h => h.trim().replace(/^﻿/, ''));
+  const need = ['精舍編號','預估信眾','預估法師','預估義工','休息區人數','預設座位數','休息區說明'];
+  if (!need.every(h => headers.includes(h))) {
+    alert('欄位格式不符，請確認標題列包含：' + need.join('、'));
+    return;
+  }
+
+  const hi = k => headers.indexOf(k);
+
+  // 取得精舍對照表（支援有/無補零格式）
+  const { data: temples } = await sb.from('temples').select('number, name');
+  const numMap = {};
+  (temples || []).forEach(t => { numMap[t.number] = t; numMap[parseInt(t.number)] = t; });
+
+  const estRows  = [];
+  const restRows = [];
+
+  rows.slice(1).forEach(r => {
+    const raw = String(r[hi('精舍編號')] || '').trim();
+    if (!raw) return;
+    const t = numMap[raw] || numMap[parseInt(raw)];
+    if (!t) return;
+
+    estRows.push({
+      event_id: actId, temple_number: t.number, vip: 0,
+      lay:        parseInt(r[hi('預估信眾')])  || 0,
+      monk:       parseInt(r[hi('預估法師')])  || 0,
+      volunteer:  parseInt(r[hi('預估義工')])  || 0,
+      driver:     parseInt(r[hi('休息區人數')]) || 0,
+      seat_count: parseInt(r[hi('預設座位數')]) || 0
+    });
+    const rest = (r[hi('休息區說明')] || '').trim();
+    if (rest) restRows.push({ event_id: actId, temple_number: t.number, description: rest });
+  });
+
+  if (!estRows.length) { alert('找不到符合的精舍編號，請確認編號正確'); return; }
+
+  const { error } = await sb.from('estimates').upsert(estRows, { onConflict: 'event_id,temple_number' });
+  if (error) { alert('儲存失敗：' + error.message); return; }
+
+  if (restRows.length) {
+    await sb.from('rest_areas').upsert(restRows, { onConflict: 'event_id,temple_number' });
+  }
+
+  dashCache = null;
+  fetchDashboard(actId);
+  alert(`✓ 已更新 ${estRows.length} 間精舍的預估人數（其餘精舍不受影響）`);
 }
 
 /* ── 活動管理 批次上傳 ── */
