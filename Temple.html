@@ -53,6 +53,14 @@ header p  { font-size:13px; opacity:.75; margin-top:2px; }
 .screen.active { display:block; }
 .error-msg { color:var(--danger); font-size:14px; margin-top:8px; text-align:center; min-height:20px; }
 .loading-msg { text-align:center; padding:48px; color:var(--muted); font-size:15px; }
+.event-card { background:var(--card); border-radius:var(--radius); padding:16px 18px; margin-bottom:10px; box-shadow:0 1px 4px rgba(0,0,0,.08); display:flex; justify-content:space-between; align-items:center; cursor:pointer; border:2px solid transparent; transition:border-color .15s; }
+.event-card:active { border-color:var(--navy); }
+.event-card-name { font-size:16px; font-weight:700; color:var(--navy); }
+.event-card-date { font-size:12px; color:var(--muted); margin-top:3px; }
+.warn-box { text-align:center; padding:48px 24px; }
+.warn-icon { font-size:56px; margin-bottom:16px; }
+.warn-title { font-size:20px; font-weight:700; color:var(--navy); margin-bottom:10px; }
+.warn-body { font-size:14px; color:var(--muted); line-height:1.9; margin-bottom:32px; }
 </style>
 </head>
 <body>
@@ -79,6 +87,27 @@ header p  { font-size:13px; opacity:.75; margin-top:2px; }
     </div>
     <button class="btn" id="btn-login" onclick="doLogin()">登入</button>
     <div id="login-error" class="error-msg"></div>
+  </div>
+</div>
+
+<div id="screen-event" class="screen">
+  <div class="container" style="padding-top:20px;">
+    <div style="font-size:15px;font-weight:700;color:var(--navy);margin-bottom:14px;">請選擇本次回報的活動</div>
+    <div id="event-list"><div class="loading-msg">載入中…</div></div>
+    <button class="btn btn-outline" onclick="doLogout()" style="margin-top:8px;">返回登入</button>
+  </div>
+</div>
+
+<div id="screen-not-registered" class="screen">
+  <div class="container">
+    <div class="warn-box">
+      <div class="warn-icon">⚠️</div>
+      <div class="warn-title">此活動未有您精舍的報名資料</div>
+      <div class="warn-body" id="not-reg-msg">
+        您的精舍尚未在此活動中登記。<br>如有疑問，請聯繫本山活動承辦人員。
+      </div>
+      <button class="btn btn-outline" onclick="show('screen-event')">返回選擇活動</button>
+    </div>
   </div>
 </div>
 
@@ -189,28 +218,70 @@ async function doLogin() {
   S.精舍編號 = data[0].number;
   S.精舍名稱 = data[0].name;
   document.getElementById('header-sub').textContent = data[0].name;
-  show('screen-loading');
-  loadPageData();
+  show('screen-event');
+  loadEventList();
 }
 
 function setErr(msg) { document.getElementById('login-error').textContent = msg; }
 
-async function loadPageData() {
-  // 取得進行中活動
+function doLogout() {
+  S.精舍編號 = null; S.精舍名稱 = null; S.活動ID = null;
+  document.getElementById('header-sub').textContent = '法會人數回報系統';
+  document.getElementById('inp-account').value = '';
+  document.getElementById('inp-password').value = '';
+  setErr('');
+  show('screen-login');
+}
+
+async function loadEventList() {
+  document.getElementById('event-list').innerHTML = '<div class="loading-msg">載入中…</div>';
   const { data: events } = await sb.from('events')
     .select('id, name, date')
     .eq('status', '進行中')
-    .limit(1);
+    .order('date', { ascending: false });
 
   if (!events?.length) {
-    alert('目前沒有進行中的活動');
-    show('screen-login');
+    document.getElementById('event-list').innerHTML =
+      '<div class="loading-msg" style="color:var(--danger);">目前沒有進行中的活動，請聯繫本山人員。</div>';
     return;
   }
-  const ev = events[0];
-  S.活動ID = ev.id;
-  document.getElementById('activity-name').textContent = ev.name;
+  document.getElementById('event-list').innerHTML = events.map(ev =>
+    `<div class="event-card" onclick="selectEvent('${ev.id}','${esc(ev.name)}')">
+       <div>
+         <div class="event-card-name">${ev.name}</div>
+         <div class="event-card-date">${ev.date}</div>
+       </div>
+       <span style="font-size:22px;color:var(--navy);">›</span>
+     </div>`
+  ).join('');
+}
 
+function esc(s) { return s.replace(/'/g,"&#39;"); }
+
+async function selectEvent(eventId, eventName) {
+  S.活動ID = eventId;
+  document.getElementById('activity-name').textContent = eventName;
+  show('screen-loading');
+
+  // 防呆：確認此精舍在本活動有報名資料
+  const { data: est } = await sb.from('estimates')
+    .select('id')
+    .eq('event_id', eventId)
+    .eq('temple_number', S.精舍編號)
+    .maybeSingle();
+
+  if (!est) {
+    document.getElementById('not-reg-msg').innerHTML =
+      `「${eventName}」尚未有您精舍（${S.精舍名稱}）的報名資料。<br>如有疑問，請聯繫本山活動承辦人員。`;
+    show('screen-not-registered');
+    return;
+  }
+
+  loadPageData();
+}
+
+async function loadPageData() {
+  // S.活動ID 已由 selectEvent() 設定
   // 平行取得休息區 + 預估人數 + 舊回報
   const [restRes, estRes, repRes] = await Promise.all([
     sb.from('rest_areas').select('description')
