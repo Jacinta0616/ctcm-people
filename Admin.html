@@ -183,9 +183,9 @@ tr.total-row td { background:#f0ede8; font-weight:700; border-top:2px solid var(
     <div id="tab-temple" class="tab-content">
       <div class="table-wrap">
         <table><thead><tr>
-          <th>精舍</th><th>信眾</th><th>法師</th><th>義工</th><th>合計</th><th>便當數</th><th>回報時間</th>
+          <th>精舍</th><th>信眾</th><th>法師</th><th>義工</th><th>合計</th><th>便當數</th><th>回點數</th><th>回報時間</th>
         </tr></thead>
-        <tbody id="temple-body"><tr><td colspan="7" class="empty-msg">請先選擇活動</td></tr></tbody>
+        <tbody id="temple-body"><tr><td colspan="8" class="empty-msg">請先選擇活動</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -317,17 +317,19 @@ async function fetchDashboard(actId) {
   dashCache = null;
   document.getElementById('last-update').textContent = '載入中…';
 
-  const [templesRes, estRes, restRes, repRes] = await Promise.all([
+  const [templesRes, estRes, restRes, repRes, pickupRes] = await Promise.all([
     sb.from('temples').select('*').order('number'),
     sb.from('estimates').select('*').eq('event_id', actId),
     sb.from('rest_areas').select('*').eq('event_id', actId),
-    sb.from('reports').select('*').eq('event_id', actId)
+    sb.from('reports').select('*').eq('event_id', actId),
+    sb.from('pickups').select('temple_number, picked_up_at').eq('event_id', actId)
   ]);
 
-  const temples = templesRes.data || [];
-  const estMap  = Object.fromEntries((estRes.data || []).map(r => [r.temple_number, r]));
-  const restMap = Object.fromEntries((restRes.data || []).map(r => [r.temple_number, r.description]));
-  const repMap  = Object.fromEntries((repRes.data || []).map(r => [r.temple_number, r]));
+  const temples   = templesRes.data || [];
+  const estMap    = Object.fromEntries((estRes.data || []).map(r => [r.temple_number, r]));
+  const restMap   = Object.fromEntries((restRes.data || []).map(r => [r.temple_number, r.description]));
+  const repMap    = Object.fromEntries((repRes.data || []).map(r => [r.temple_number, r]));
+  const pickupMap = Object.fromEntries((pickupRes.data || []).map(p => [p.temple_number, p.picked_up_at]));
 
   // 比較總覽（只計入有在精舍設定填入預估人數的精舍）
   const compRows = temples.filter(t => estMap[t.number] !== undefined).map(t => {
@@ -374,25 +376,37 @@ async function fetchDashboard(actId) {
       const 信眾 = (rep.vip||0) + rep.lay;
       const volunteer = rep.volunteer || 0;
       return { number: t.number, name: t.name, 信眾, monk: rep.monk, volunteer, driver: rep.driver,
+               returnCount: rep.return_count || 0,
                total: 信眾+rep.monk+volunteer,
                reportedAt: new Date(rep.reported_at).toLocaleString('zh-TW',{timeZone:'Asia/Taipei'}) };
     }).filter(Boolean);
   const 總計 = templeRows.reduce(
-    (a, r) => ({ 信眾:a.信眾+r.信眾, monk:a.monk+r.monk, volunteer:a.volunteer+r.volunteer, driver:a.driver+r.driver, total:a.total+r.total }),
-    { 信眾:0, monk:0, volunteer:0, driver:0, total:0 }
+    (a, r) => ({ 信眾:a.信眾+r.信眾, monk:a.monk+r.monk, volunteer:a.volunteer+r.volunteer, driver:a.driver+r.driver, returnCount:a.returnCount+r.returnCount, total:a.total+r.total }),
+    { 信眾:0, monk:0, volunteer:0, driver:0, returnCount:0, total:0 }
   );
 
-  // 齋供視角（依殿堂加總便當數）
+  // 齋供視角（依殿堂加總便當數 + 回點數 + 領取狀態）
   const mealMap = {};
   let mealTotal = 0;
+  let mealReturnTotal = 0;
   temples.forEach(t => {
     const rep = repMap[t.number];
     if (!rep) return;
     const hall = restMap[t.number] || '（未分配）';
-    if (!mealMap[hall]) mealMap[hall] = { count: 0, detail: [] };
+    if (!mealMap[hall]) mealMap[hall] = { count: 0, returnCount: 0, detail: [] };
     mealMap[hall].count += rep.driver;
-    mealMap[hall].detail.push({ name: t.name, count: rep.driver });
+    mealMap[hall].returnCount += rep.return_count || 0;
+    const pickedUp = !!pickupMap[t.number];
+    const pickedUpAt = pickedUp
+      ? new Date(pickupMap[t.number]).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' })
+      : null;
+    mealMap[hall].detail.push({
+      name: t.name, number: t.number,
+      count: rep.driver, returnCount: rep.return_count || 0,
+      pickedUp, pickedUpAt
+    });
     mealTotal += rep.driver;
+    mealReturnTotal += rep.return_count || 0;
   });
 
   // 精舍設定
@@ -404,7 +418,7 @@ async function fetchDashboard(actId) {
   });
 
   const actName = document.getElementById('activity-select').selectedOptions[0]?.textContent || actId;
-  dashCache = { actId, actName, compRows, mainCount, totalSeatCount, hallMap, mealMap, mealTotal, templeRows, 總計, setupRows,
+  dashCache = { actId, actName, compRows, mainCount, totalSeatCount, hallMap, mealMap, mealTotal, mealReturnTotal, pickupMap, templeRows, 總計, setupRows,
                 未回報數: compRows.filter(r => !r.reported).length };
   document.getElementById('last-update').textContent =
     '更新：' + new Date().toLocaleTimeString('zh-TW',{timeZone:'Asia/Taipei'});
@@ -537,10 +551,10 @@ function renderTemple() {
   const t = dashCache.總計;
   document.getElementById('temple-body').innerHTML =
     dashCache.templeRows.map(r =>
-      `<tr><td>${r.name}</td><td>${r.信眾}</td><td>${r.monk}</td><td>${r.volunteer}</td><td><strong>${r.total}</strong></td><td>${r.driver}</td><td>${r.reportedAt}</td></tr>`
+      `<tr><td>${r.name}</td><td>${r.信眾}</td><td>${r.monk}</td><td>${r.volunteer}</td><td><strong>${r.total}</strong></td><td>${r.driver}</td><td>${r.returnCount}</td><td>${r.reportedAt}</td></tr>`
     ).join('') +
-    `<tr class="total-row"><td>合計</td><td>${t.信眾}</td><td>${t.monk}</td><td>${t.volunteer}</td><td>${t.total}</td><td>${t.driver}</td><td></td></tr>`
-    || '<tr><td colspan="7" class="empty-msg">尚無回報資料</td></tr>';
+    `<tr class="total-row"><td>合計</td><td>${t.信眾}</td><td>${t.monk}</td><td>${t.volunteer}</td><td>${t.total}</td><td>${t.driver}</td><td>${t.returnCount}</td><td></td></tr>`
+    || '<tr><td colspan="8" class="empty-msg">尚無回報資料</td></tr>';
 }
 
 /* ── 齋供視角 ── */
@@ -551,20 +565,55 @@ function renderMeal() {
     document.getElementById('meal-content').innerHTML = '<div class="empty-msg">尚無回報資料</div>';
     return;
   }
-  let html = '<div class="hall-grid">';
+
+  const allDetail    = entries.flatMap(([, v]) => v.detail);
+  const pickedCount  = allDetail.filter(d => d.pickedUp).length;
+  const totalCount   = allDetail.length;
+  const notPickedList = allDetail.filter(d => !d.pickedUp).map(d => d.name);
+
+  let html = '';
+
+  // 狀態摘要列
+  html += `<div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:14px;">
+    <span style="font-size:14px;font-weight:700;color:#1a7a3c;">✓ 已領取 ${pickedCount} 間</span>
+    <span style="font-size:14px;font-weight:700;color:#b8860b;">⏳ 未領取 ${totalCount - pickedCount} 間</span>
+    <button class="btn btn-sm btn-outline" onclick="fetchDashboard(dashCache.actId)" style="margin-left:auto;padding:4px 12px;font-size:12px;">↻ 重新整理</button>
+  </div>`;
+
+  // 未領取提示列
+  if (notPickedList.length) {
+    html += `<div style="background:#fff8e1;border-radius:10px;padding:12px 16px;margin-bottom:16px;font-size:13px;color:#b8860b;line-height:1.7;">
+      <strong>⏳ 尚未領取：</strong>${notPickedList.join('、')}
+    </div>`;
+  }
+
+  html += '<div class="hall-grid">';
   entries.forEach(([hall, v]) => {
     html += `<div class="hall-card">
       <div class="hall-title">🍱 ${hall}</div>
-      <div class="hall-count">${v.count} <span>份</span></div>`;
-    if (v.detail.length) html += '<div class="detail-list">' +
-      v.detail.map(d => `<div class="detail-row"><span>${d.name}</span><span>${d.count} 份</span></div>`).join('') +
-      '</div>';
+      <div class="hall-count" style="font-size:26px;">${v.count} <span>份便當</span>
+        <span style="font-size:13px;color:var(--muted);margin-left:6px;">+ ${v.returnCount} 回點</span>
+      </div>`;
+    if (v.detail.length) {
+      html += '<div class="detail-list">' + v.detail.map(d => {
+        const badge = d.pickedUp
+          ? `<span style="color:#1a7a3c;font-size:11px;font-weight:700;">✓ 已領取</span><br><span style="font-size:10px;color:#aaa;">${d.pickedUpAt}</span>`
+          : `<span style="color:#b8860b;font-size:11px;font-weight:700;">⏳ 未領取</span>`;
+        return `<div class="detail-row" style="align-items:flex-start;padding:5px 0;">
+          <span>${d.name}</span>
+          <span style="text-align:right;line-height:1.7;">便 ${d.count}／回 ${d.returnCount}<br>${badge}</span>
+        </div>`;
+      }).join('') + '</div>';
+    }
     html += '</div>';
   });
+
   html += `<div class="hall-card" style="background:#f0ede8;">
-    <div class="hall-title">📊 便當總計</div>
-    <div class="hall-count">${c.mealTotal} <span>份</span></div>
+    <div class="hall-title">📊 合計</div>
+    <div class="hall-count" style="font-size:26px;">${c.mealTotal} <span>份便當</span></div>
+    <div style="font-size:14px;color:var(--muted);margin-top:4px;">回點數：${c.mealReturnTotal} 份</div>
   </div>`;
+
   document.getElementById('meal-content').innerHTML = html + '</div>';
 }
 
@@ -646,9 +695,6 @@ async function clearActivityData() {
 }
 
 async function setStatus(actId, status) {
-  if (status === '進行中') {
-    await sb.from('events').update({ status: '已結束' }).eq('status', '進行中');
-  }
   await sb.from('events').update({ status }).eq('id', actId);
   loadActivityList();
   loadActivities();
@@ -1224,27 +1270,27 @@ async function downloadExcel() {
   // Sheet 4：精舍視角
   // ══════════════════════════════════════
   const s2 = wb.addWorksheet('精舍視角');
-  titleRow(s2, c.actName + ' — 精舍視角（含便當數）', 6);
+  titleRow(s2, c.actName + ' — 精舍視角（含便當數）', 7);
   s2.addRow([]); s2.addRow([]);
 
-  hdrRow(s2, ['精舍','信眾','法師','義工','合計（不含便當）','便當數','回報時間']);
+  hdrRow(s2, ['精舍','信眾','法師','義工','合計（不含便當）','便當數','回點數','回報時間']);
 
   c.templeRows.forEach(r => {
-    dataRow(s2, [r.name, r.信眾, r.monk, r.volunteer, r.total, r.driver, r.reportedAt], null, [2,3,4,5,6]);
+    dataRow(s2, [r.name, r.信眾, r.monk, r.volunteer, r.total, r.driver, r.returnCount, r.reportedAt], null, [2,3,4,5,6,7]);
   });
 
   const tt = c.總計;
-  const tRow = s2.addRow(['合計', tt.信眾, tt.monk, tt.volunteer, tt.total, tt.driver, '']);
+  const tRow = s2.addRow(['合計', tt.信眾, tt.monk, tt.volunteer, tt.total, tt.driver, tt.returnCount, '']);
   tRow.height = 22;
-  for (let i = 1; i <= 7; i++) {
+  for (let i = 1; i <= 8; i++) {
     tRow.getCell(i).fill = GRAY_FILL;
     tRow.getCell(i).font = { bold:true, size:11, color:{ argb:'FF2D4A6E' } };
     tRow.getCell(i).border = BORDER;
     tRow.getCell(i).alignment = i===1 ? MID : CENTER;
   }
 
-  s2.getColumn(1).width = 15; [2,3,4,5,6].forEach(i => s2.getColumn(i).width = 8);
-  s2.getColumn(7).width = 22;
+  s2.getColumn(1).width = 15; [2,3,4,5,6,7].forEach(i => s2.getColumn(i).width = 8);
+  s2.getColumn(8).width = 22;
   s2.views = [{ state:'frozen', xSplit:0, ySplit:5 }];
 
   // ══════════════════════════════════════
