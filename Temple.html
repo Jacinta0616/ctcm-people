@@ -265,7 +265,7 @@ async function selectEvent(eventId, eventName) {
 
   // 防呆：確認此精舍在本活動有報名資料
   const { data: est } = await sb.from('estimates')
-    .select('id')
+    .select('event_id')
     .eq('event_id', eventId)
     .eq('temple_number', S.精舍編號)
     .maybeSingle();
