@@ -263,57 +263,59 @@ async function selectEvent(eventId, eventName) {
   document.getElementById('activity-name').textContent = eventName;
   show('screen-loading');
 
-  // 防呆：確認此精舍在本活動有報名資料
-  const { data: est } = await sb.from('estimates')
-    .select('event_id')
-    .eq('event_id', eventId)
-    .eq('temple_number', S.精舍編號)
-    .maybeSingle();
+  // 防呆 + 頁面資料一次平行查詢，省去兩輪來回
+  const [restRes, estRes, repRes] = await Promise.all([
+    sb.from('rest_areas').select('description')
+      .eq('event_id', eventId).eq('temple_number', S.精舍編號).maybeSingle(),
+    sb.from('estimates').select('vip,lay,monk,volunteer,driver')
+      .eq('event_id', eventId).eq('temple_number', S.精舍編號).maybeSingle(),
+    sb.from('reports').select('*')
+      .eq('event_id', eventId).eq('temple_number', S.精舍編號).maybeSingle()
+  ]);
 
-  if (!est) {
+  if (!estRes.data) {
     document.getElementById('not-reg-msg').innerHTML =
       `「${eventName}」尚未有您精舍（${S.精舍名稱}）的報名資料。<br>如有疑問，請聯繫本山活動承辦人員。`;
     show('screen-not-registered');
     return;
   }
 
-  loadPageData();
+  renderMain(restRes.data, estRes.data, repRes.data);
 }
 
 async function loadPageData() {
-  // S.活動ID 已由 selectEvent() 設定
-  // 平行取得休息區 + 預估人數 + 舊回報
+  // 重新回報時呼叫，S.活動ID 已設定
   const [restRes, estRes, repRes] = await Promise.all([
     sb.from('rest_areas').select('description')
-      .eq('event_id', ev.id).eq('temple_number', S.精舍編號).maybeSingle(),
+      .eq('event_id', S.活動ID).eq('temple_number', S.精舍編號).maybeSingle(),
     sb.from('estimates').select('vip,lay,monk,volunteer,driver')
-      .eq('event_id', ev.id).eq('temple_number', S.精舍編號).maybeSingle(),
+      .eq('event_id', S.活動ID).eq('temple_number', S.精舍編號).maybeSingle(),
     sb.from('reports').select('*')
-      .eq('event_id', ev.id).eq('temple_number', S.精舍編號).maybeSingle()
+      .eq('event_id', S.活動ID).eq('temple_number', S.精舍編號).maybeSingle()
   ]);
+  renderMain(restRes.data, estRes.data, repRes.data);
+}
 
-  document.getElementById('rest-area').textContent =
-    restRes.data?.description || '（尚未分配）';
+function renderMain(rest, est, prev) {
+  document.getElementById('rest-area').textContent = rest?.description || '（尚未分配）';
 
-  const est = estRes.data;
   if (est) {
     document.getElementById('est-card').style.display = 'block';
     document.getElementById('est-mini').innerHTML = miniGrid((est.vip||0)+(est.lay||0), est.monk, est.volunteer||0, est.driver, 0);
   }
 
-  const prev = repRes.data;
   if (prev) {
     const timeStr = new Date(prev.reported_at)
       .toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' });
     document.getElementById('prev-card').style.display = 'block';
     document.getElementById('prev-time-text').textContent = '回報時間：' + timeStr;
     document.getElementById('prev-mini').innerHTML = miniGrid((prev.vip||0)+prev.lay, prev.monk, prev.volunteer||0, prev.driver, prev.return_count||0);
-    document.getElementById('f-lay').value       = (prev.vip||0) + prev.lay;
-    document.getElementById('f-monk').value      = prev.monk;
-    document.getElementById('f-volunteer').value = prev.volunteer || 0;
-    document.getElementById('f-driver').value        = prev.driver;
-    document.getElementById('f-return-count').value  = prev.return_count || 0;
-    document.getElementById('f-note').value           = prev.note || '';
+    document.getElementById('f-lay').value        = (prev.vip||0) + prev.lay;
+    document.getElementById('f-monk').value       = prev.monk;
+    document.getElementById('f-volunteer').value  = prev.volunteer || 0;
+    document.getElementById('f-driver').value       = prev.driver;
+    document.getElementById('f-return-count').value = prev.return_count || 0;
+    document.getElementById('f-note').value          = prev.note || '';
     calcTotal();
   }
   show('screen-main');
