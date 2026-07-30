@@ -233,7 +233,7 @@ tr.total-row td { background:#f0ede8; font-weight:700; border-top:2px solid var(
         <button class="btn btn-outline btn-sm" onclick="document.getElementById('file-setup').click()">⬆ 上傳設定</button>
         <button class="btn btn-outline btn-sm" onclick="copyFromPrevEvent()">↩ 複製上場預估</button>
         <input type="file" id="file-setup" accept=".csv,.xlsx,.xls" style="display:none" onchange="handleUploadSetup(this)">
-        <span class="upload-hint" id="setup-upload-hint">格式：精舍編號, 預估信眾/法師/義工/便當數/預設座位數, 休息區說明（支援 Excel / CSV）</span>
+        <span class="upload-hint" id="setup-upload-hint">格式：精舍編號, 預估信眾/法師/義工/休息區人數/預設座位數/休息區說明（支援 Excel / CSV）｜上傳前請先選好活動並等預估人數列表載入</span>
       </div>
       <div class="setup-toolbar">
         <button class="btn btn-success" id="btn-save-setup" onclick="doSaveSetup()">儲存全部</button>
