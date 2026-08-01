@@ -92,28 +92,52 @@ tr.total-row td { background:#f0ede8; font-weight:700; border-top:2px solid var(
   <div id="tab-comparison" class="tab-content active">
     <div id="comp-stats" class="stat-row"></div>
     <div id="comp-summary"></div>
-    <div style="margin-top:14px;margin-bottom:8px;">
-      <input id="comp-search" type="text" placeholder="🔍 搜尋精舍名稱或代碼…"
-        style="width:100%;max-width:320px;padding:7px 12px;border:1px solid #ccc;border-radius:8px;font-size:14px;"
-        oninput="compSearch=this.value;renderComparison(dashCache?.compRows||[])">
+    <!-- 密碼鎖 -->
+    <div id="detail-lock" style="margin-top:16px;background:#fff;border-radius:12px;padding:28px 24px;text-align:center;box-shadow:0 1px 3px rgba(0,0,0,.07);">
+      <div style="font-size:32px;margin-bottom:10px;">🔒</div>
+      <div style="font-size:15px;font-weight:600;color:var(--navy);margin-bottom:6px;">各精舍詳細數據</div>
+      <div style="font-size:13px;color:var(--muted);margin-bottom:18px;">輸入密碼以查看各精舍回報明細</div>
+      <div style="display:flex;gap:8px;justify-content:center;max-width:320px;margin:0 auto;">
+        <input id="detail-pw" type="password" placeholder="請輸入密碼"
+          style="flex:1;padding:9px 12px;border:1px solid #ccc;border-radius:8px;font-size:14px;"
+          onkeydown="if(event.key==='Enter')unlockDetail()">
+        <button onclick="unlockDetail()"
+          style="padding:9px 18px;background:var(--navy);color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;">
+          解鎖
+        </button>
+      </div>
+      <div id="detail-pw-err" style="color:var(--danger);font-size:12px;margin-top:8px;min-height:18px;"></div>
     </div>
-    <div class="table-wrap">
-      <table>
-        <thead>
-          <tr>
-            <th rowspan="2" style="vertical-align:middle;">精舍</th>
-            <th colspan="3" style="text-align:center;background:#2a4a7a;">── 報名人數 ──</th>
-            <th colspan="3" style="text-align:center;background:#1a6030;">── 實到人數 ──</th>
-            <th rowspan="2" style="vertical-align:middle;text-align:center;">落差</th>
-            <th rowspan="2" style="vertical-align:middle;text-align:center;">報到率</th>
-          </tr>
-          <tr>
-            <th>參加法會</th><th>法師</th><th>義工</th>
-            <th>參加法會</th><th>法師</th><th>義工</th>
-          </tr>
-        </thead>
-        <tbody id="comp-detail-body"><tr><td colspan="9" class="empty-msg">請先選擇活動</td></tr></tbody>
-      </table>
+
+    <!-- 詳細數據（預設隱藏） -->
+    <div id="detail-section" style="display:none;margin-top:14px;">
+      <div style="margin-bottom:8px;display:flex;align-items:center;gap:10px;">
+        <input id="comp-search" type="text" placeholder="🔍 搜尋精舍名稱或代碼…"
+          style="padding:7px 12px;border:1px solid #ccc;border-radius:8px;font-size:14px;width:100%;max-width:320px;"
+          oninput="compSearch=this.value;renderComparison(dashCache?.compRows||[])">
+        <button onclick="lockDetail()"
+          style="padding:6px 12px;background:#f0ede8;color:var(--navy);border:1px solid #ccc;border-radius:8px;font-size:13px;cursor:pointer;white-space:nowrap;">
+          🔒 重新鎖定
+        </button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th rowspan="2" style="vertical-align:middle;">精舍</th>
+              <th colspan="3" style="text-align:center;background:#2a4a7a;">── 報名人數 ──</th>
+              <th colspan="3" style="text-align:center;background:#1a6030;">── 實到人數 ──</th>
+              <th rowspan="2" style="vertical-align:middle;text-align:center;">落差</th>
+              <th rowspan="2" style="vertical-align:middle;text-align:center;">報到率</th>
+            </tr>
+            <tr>
+              <th>參加法會</th><th>法師</th><th>義工</th>
+              <th>參加法會</th><th>法師</th><th>義工</th>
+            </tr>
+          </thead>
+          <tbody id="comp-detail-body"><tr><td colspan="9" class="empty-msg">請先選擇活動</td></tr></tbody>
+        </table>
+      </div>
     </div>
   </div>
 
@@ -137,6 +161,26 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 let currentTab = 'comparison';
 let dashCache  = null;
 let compSearch = '';
+const DETAIL_PASSWORD = 'ctcm2026';
+
+function unlockDetail() {
+  const pw = document.getElementById('detail-pw').value;
+  if (pw !== DETAIL_PASSWORD) {
+    document.getElementById('detail-pw-err').textContent = '密碼錯誤，請重試';
+    document.getElementById('detail-pw').value = '';
+    return;
+  }
+  document.getElementById('detail-lock').style.display = 'none';
+  document.getElementById('detail-section').style.display = 'block';
+  document.getElementById('detail-pw-err').textContent = '';
+  if (dashCache) renderComparison();
+}
+
+function lockDetail() {
+  document.getElementById('detail-section').style.display = 'none';
+  document.getElementById('detail-lock').style.display = 'block';
+  document.getElementById('detail-pw').value = '';
+}
 const ALL_TABS = ['comparison','hall','meal'];
 
 async function init() {
