@@ -157,11 +157,14 @@ tr.total-row td { background:#f0ede8; font-weight:700; border-top:2px solid var(
 
     <div id="tab-comparison" class="tab-content active">
       <div id="comp-stats" class="stat-row"></div>
-      <div id="comp-filter-bar" style="display:none;margin-bottom:10px;gap:6px;flex-wrap:wrap;" class="upload-bar">
+      <div id="comp-filter-bar" style="display:none;margin-bottom:10px;gap:6px;flex-wrap:wrap;align-items:center;" class="upload-bar">
         <button class="btn btn-sm comp-fbtn active" onclick="setCompFilter('all')">全部</button>
         <button class="btn btn-sm comp-fbtn" onclick="setCompFilter('reported')">已回報</button>
         <button class="btn btn-sm comp-fbtn" onclick="setCompFilter('unreported')">未回報</button>
         <span id="comp-filter-hint" style="font-size:12px;color:var(--muted);"></span>
+        <input id="comp-search" type="text" placeholder="🔍 搜尋精舍名稱或代碼…"
+          style="margin-left:auto;padding:5px 10px;border:1px solid #ccc;border-radius:6px;font-size:13px;width:220px;"
+          oninput="compSearch=this.value;renderComparison(dashCache.compRows)">
       </div>
       <div class="table-wrap">
         <table>
@@ -280,6 +283,7 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 let currentTab  = 'comparison';
 let dashCache   = null;
 let compFilter  = 'all'; // 'all' | 'reported' | 'unreported'
+let compSearch  = '';
 
 function show(id) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
@@ -544,6 +548,10 @@ function renderComparison() {
   let display = [...rows];
   if (compFilter === 'reported')   display = display.filter(r => r.reported);
   if (compFilter === 'unreported') display = display.filter(r => !r.reported);
+  if (compSearch.trim()) {
+    const q = compSearch.trim().toLowerCase();
+    display = display.filter(r => r.name.toLowerCase().includes(q) || r.number.toLowerCase().includes(q));
+  }
   display.sort((a,b) => {
     if (compFilter === 'all' && a.reported !== b.reported) return a.reported ? 1 : -1;
     return a.number.localeCompare(b.number);
@@ -561,6 +569,9 @@ function renderComparison() {
   const totRMonk = repRows.reduce((s,r) => s+r.repMonk, 0);
   const totRVol  = repRows.reduce((s,r) => s+r.repVol,  0);
   const totDiff  = (totRLay+totRMonk+totRVol) - (totELay+totEMonk+totEVol);
+  const totEPpl  = totELay + totEMonk + totEVol;
+  const totRPpl  = totRLay + totRMonk + totRVol;
+  const totRate  = totEPpl > 0 ? Math.round(totRPpl / totEPpl * 100) + '%' : '—';
 
   document.getElementById('comp-body').innerHTML =
     display.map(r => {
@@ -569,7 +580,7 @@ function renderComparison() {
         ? '<span class="badge badge-ok">已回報</span>'
         : '<span class="badge badge-wait">未回報</span>';
       return `<tr${cls}>
-        <td>${r.name}</td>
+        <td><span style="color:var(--muted);font-size:12px;margin-right:4px;">${r.number}</span>${r.name}</td>
         <td style="text-align:center;">${r.estLay}</td>
         <td style="text-align:center;">${r.estMonk}</td>
         <td style="text-align:center;">${r.estVol}</td>
@@ -590,7 +601,8 @@ function renderComparison() {
       <td style="text-align:center;">${totRMonk}</td>
       <td style="text-align:center;">${totRVol}</td>
       <td style="text-align:center;">${diffFmt(totDiff)}</td>
-      <td></td><td></td>
+      <td style="text-align:center;">${totRate}</td>
+      <td></td>
     </tr>`
     || '<tr><td colspan="10" class="empty-msg">無資料</td></tr>';
 }
@@ -759,7 +771,8 @@ async function deleteActivity(actId, actName) {
   await Promise.all([
     sb.from('estimates').delete().eq('event_id', actId),
     sb.from('rest_areas').delete().eq('event_id', actId),
-    sb.from('reports').delete().eq('event_id', actId)
+    sb.from('reports').delete().eq('event_id', actId),
+    sb.from('pickups').delete().eq('event_id', actId)
   ]);
   const { error } = await sb.from('events').delete().eq('id', actId);
   if (error) { alert('刪除失敗：' + error.message); return; }
@@ -930,13 +943,16 @@ async function doSaveSetup() {
   if (!rows.length) { alert('沒有資料可儲存'); return; }
   setBtn('btn-save-setup', true, '儲存中…');
 
-  const estRows  = rows.map(r => ({ event_id:r.event_id, temple_number:r.temple_number, vip:0, lay:r.lay, monk:r.monk, volunteer:r.volunteer, driver:r.driver, seat_count:r.seat_count }));
-  const restRows = rows.filter(r => r._rest).map(r => ({ event_id:r.event_id, temple_number:r.temple_number, description:r._rest }));
+  const estRows   = rows.map(r => ({ event_id:r.event_id, temple_number:r.temple_number, vip:0, lay:r.lay, monk:r.monk, volunteer:r.volunteer, driver:r.driver, seat_count:r.seat_count }));
+  const restRows  = rows.filter(r => r._rest).map(r => ({ event_id:r.event_id, temple_number:r.temple_number, description:r._rest }));
+  const clearNums = rows.filter(r => !r._rest).map(r => r.temple_number);
 
-  const [e1, e2] = await Promise.all([
-    sb.from('estimates').upsert(estRows, { onConflict: 'event_id,temple_number' }),
-    sb.from('rest_areas').upsert(restRows, { onConflict: 'event_id,temple_number' })
-  ]);
+  const ops = [sb.from('estimates').upsert(estRows, { onConflict: 'event_id,temple_number' })];
+  if (restRows.length)  ops.push(sb.from('rest_areas').upsert(restRows, { onConflict: 'event_id,temple_number' }));
+  if (clearNums.length) ops.push(sb.from('rest_areas').delete().eq('event_id', actId).in('temple_number', clearNums));
+  const results = await Promise.all(ops);
+  const e1 = results[0];
+  const e2 = { error: null };
 
   setBtn('btn-save-setup', false, '儲存全部');
   if (e1.error || e2.error) { alert('儲存失敗：' + (e1.error||e2.error).message); return; }
@@ -1451,10 +1467,9 @@ async function downloadExcel() {
 
   function addCompSheet(sheetName, title, rows, showStats) {
     const ws = wb.addWorksheet(sheetName);
-    titleRow(ws, title, 7);
+    titleRow(ws, title, 10);
     ws.addRow([]);
     if (showStats) {
-      const repSum = c.compRows.reduce((a,r) => a+(r.repTotal||0), 0);
       const sr = ws.addRow(['精舍總數', c.compRows.length, '', '已回報', reported, '未回報', c.未回報數]);
       sr.height = 22;
       [[1,'FF444444'],[2,'FF2D4A6E'],[4,'FF2E7D32'],[5,'FF2E7D32'],
@@ -1464,22 +1479,75 @@ async function downloadExcel() {
       });
       ws.addRow([]);
     }
-    hdrRow(ws, ['精舍','報名人數','已回報人數','差異數','報到率','回報時間','狀態']);
+
+    // 雙層表頭
+    const NAVY2 = { type:'pattern', pattern:'solid', fgColor:{ argb:'FF2A4A7A' } };
+    const GREEN2 = { type:'pattern', pattern:'solid', fgColor:{ argb:'FF1A6030' } };
+    const HDR_FONT = { bold:true, color:{ argb:'FFFFFFFF' } };
+    const h1 = ws.addRow(['精舍', '報名人數', '', '', '實到人數', '', '', '落差', '報到率', '狀態']);
+    h1.height = 22;
+    h1.getCell(1).fill = { type:'pattern', pattern:'solid', fgColor:{ argb:'FF2D4A6E' } };
+    [2,3,4].forEach(i => { h1.getCell(i).fill = NAVY2; });
+    [5,6,7].forEach(i => { h1.getCell(i).fill = GREEN2; });
+    [8,9,10].forEach(i => { h1.getCell(i).fill = { type:'pattern', pattern:'solid', fgColor:{ argb:'FF2D4A6E' } }; });
+    h1.eachCell(cell => { cell.font = HDR_FONT; cell.alignment = CENTER; });
+    const h1r = h1.number;
+    ws.mergeCells(h1r, 2, h1r, 4);
+    ws.mergeCells(h1r, 5, h1r, 7);
+
+    const h2 = ws.addRow(['', '參加法會', '法師', '義工', '參加法會', '法師', '義工', '', '', '']);
+    h2.height = 18;
+    [2,3,4].forEach(i => { h2.getCell(i).fill = NAVY2; h2.getCell(i).font = HDR_FONT; h2.getCell(i).alignment = CENTER; });
+    [5,6,7].forEach(i => { h2.getCell(i).fill = GREEN2; h2.getCell(i).font = HDR_FONT; h2.getCell(i).alignment = CENTER; });
+
+    // 資料列
+    const passedRep = rows.filter(r => r.reported);
     rows.forEach(r => {
-      const row = dataRow(ws,
-        [r.name, r.estTotal??'', r.repTotal??'', r.落差??'', r.報到率||'', r.reportedAt||'', r.reported?'已回報':'未回報'],
-        !r.reported ? OG_FILL : null, [2,3,4,5,7]
-      );
-      if (r.落差 !== null && r.落差 !== undefined) {
-        row.getCell(4).font = { color:{ argb: r.落差>0?'FF1565C0':r.落差<0?'FFC62828':'FF444444' }, bold: r.落差!==0 };
+      const d = r.diffPeople;
+      const row = ws.addRow([
+        r.name,
+        r.estLay, r.estMonk, r.estVol,
+        r.reported ? r.repLay  : '',
+        r.reported ? r.repMonk : '',
+        r.reported ? r.repVol  : '',
+        d ?? '',
+        r.報到率 || '',
+        r.reported ? '已回報' : '未回報'
+      ]);
+      if (!r.reported) row.eachCell(cell => { cell.fill = OG_FILL; });
+      [2,3,4,5,6,7,8,9].forEach(i => row.getCell(i).alignment = CENTER);
+      if (d !== null && d !== undefined && d !== '') {
+        row.getCell(8).font = { color:{ argb: d>0?'FF1565C0':d<0?'FFC62828':'FF444444' }, bold: d!==0 };
       }
-      row.getCell(7).font = { bold:true, color:{ argb: r.reported?'FF2E7D32':'FFE65100' } };
-      row.getCell(7).alignment = CENTER;
+      row.getCell(10).font  = { bold:true, color:{ argb: r.reported?'FF2E7D32':'FFE65100' } };
+      row.getCell(10).alignment = CENTER;
     });
-    ws.getColumn(1).width = 15; ws.getColumn(2).width = 10; ws.getColumn(3).width = 10;
-    ws.getColumn(4).width = 8;  ws.getColumn(5).width = 8;  ws.getColumn(6).width = 22;
-    ws.getColumn(7).width = 9;
-    ws.views = [{ state:'frozen', xSplit:0, ySplit: showStats ? 6 : 4 }];
+
+    // 合計列
+    const totELay  = rows.reduce((s,r) => s+r.estLay, 0);
+    const totEMonk = rows.reduce((s,r) => s+r.estMonk, 0);
+    const totEVol  = rows.reduce((s,r) => s+r.estVol, 0);
+    const totRLay  = passedRep.reduce((s,r) => s+r.repLay, 0);
+    const totRMonk = passedRep.reduce((s,r) => s+r.repMonk, 0);
+    const totRVol  = passedRep.reduce((s,r) => s+r.repVol, 0);
+    const totDiff  = (totRLay+totRMonk+totRVol) - (totELay+totEMonk+totEVol);
+    const totEPpl  = totELay + totEMonk + totEVol;
+    const totRPpl  = totRLay + totRMonk + totRVol;
+    const totXlRate = totEPpl > 0 ? Math.round(totRPpl / totEPpl * 100) + '%' : '';
+    const totRow = ws.addRow([
+      `合計（已回報 ${passedRep.length}／${rows.length} 間）`,
+      totELay, totEMonk, totEVol,
+      totRLay, totRMonk, totRVol,
+      totDiff, totXlRate, ''
+    ]);
+    totRow.eachCell(cell => { cell.fill = { type:'pattern', pattern:'solid', fgColor:{ argb:'FFF0EDE8' } }; cell.font = { bold:true }; });
+    [2,3,4,5,6,7,8,9].forEach(i => totRow.getCell(i).alignment = CENTER);
+    if (totDiff !== 0) totRow.getCell(8).font = { bold:true, color:{ argb: totDiff>0?'FF1565C0':'FFC62828' } };
+
+    ws.getColumn(1).width = 18;
+    [2,3,4,5,6,7].forEach(i => ws.getColumn(i).width = 10);
+    ws.getColumn(8).width = 8; ws.getColumn(9).width = 8; ws.getColumn(10).width = 9;
+    ws.views = [{ state:'frozen', xSplit:0, ySplit: showStats ? 7 : 5 }];
   }
 
   // ══════════════════════════════════════
@@ -1519,7 +1587,7 @@ async function downloadExcel() {
   // Sheet 4：精舍視角
   // ══════════════════════════════════════
   const s2 = wb.addWorksheet('精舍視角');
-  titleRow(s2, c.actName + ' — 精舍視角（含便當數）', 7);
+  titleRow(s2, c.actName + ' — 精舍視角（含便當數）', 8);
   s2.addRow([]); s2.addRow([]);
 
   hdrRow(s2, ['精舍','信眾','法師','義工','合計（不含便當）','便當數','回點數','回報時間']);

@@ -298,11 +298,14 @@ function showConfirm() {
 }
 
 async function showDone() {
-  // 記錄領取時間
-  await sb.from('pickups').upsert(
+  const { error } = await sb.from('pickups').upsert(
     { event_id: G.actId, temple_number: G.templeNumber, picked_up_at: new Date().toISOString() },
     { onConflict: 'event_id,temple_number' }
   );
+  if (error) {
+    alert('領取記錄儲存失敗，請重試或告知管理員：' + error.message);
+    return;
+  }
   document.getElementById('done-temple-name').textContent = G.templeName + '　' + G.actName;
   document.getElementById('done-driver').textContent      = G.driver;
   document.getElementById('done-return').textContent      = G.returnCount;

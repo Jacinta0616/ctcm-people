@@ -92,7 +92,12 @@ tr.total-row td { background:#f0ede8; font-weight:700; border-top:2px solid var(
   <div id="tab-comparison" class="tab-content active">
     <div id="comp-stats" class="stat-row"></div>
     <div id="comp-summary"></div>
-    <div class="table-wrap" style="margin-top:14px;">
+    <div style="margin-top:14px;margin-bottom:8px;">
+      <input id="comp-search" type="text" placeholder="🔍 搜尋精舍名稱或代碼…"
+        style="width:100%;max-width:320px;padding:7px 12px;border:1px solid #ccc;border-radius:8px;font-size:14px;"
+        oninput="compSearch=this.value;renderComparison(dashCache?.compRows||[])">
+    </div>
+    <div class="table-wrap">
       <table>
         <thead>
           <tr>
@@ -100,13 +105,14 @@ tr.total-row td { background:#f0ede8; font-weight:700; border-top:2px solid var(
             <th colspan="3" style="text-align:center;background:#2a4a7a;">── 報名人數 ──</th>
             <th colspan="3" style="text-align:center;background:#1a6030;">── 實到人數 ──</th>
             <th rowspan="2" style="vertical-align:middle;text-align:center;">落差</th>
+            <th rowspan="2" style="vertical-align:middle;text-align:center;">報到率</th>
           </tr>
           <tr>
             <th>參加法會</th><th>法師</th><th>義工</th>
             <th>參加法會</th><th>法師</th><th>義工</th>
           </tr>
         </thead>
-        <tbody id="comp-detail-body"><tr><td colspan="8" class="empty-msg">請先選擇活動</td></tr></tbody>
+        <tbody id="comp-detail-body"><tr><td colspan="9" class="empty-msg">請先選擇活動</td></tr></tbody>
       </table>
     </div>
   </div>
@@ -130,6 +136,7 @@ const SUPABASE_KEY = 'sb_publishable_NnGcMxbnG_D_3qDeFahMqQ_MjSsPzHQ';
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 let currentTab = 'comparison';
 let dashCache  = null;
+let compSearch = '';
 const ALL_TABS = ['comparison','hall','meal'];
 
 async function init() {
@@ -195,7 +202,7 @@ async function fetchDashboard(actId) {
     const estPeople = estLay + estMonk + estVol;
     const repPeople = rep ? repLay + repMonk + repVol : null;
     const diffPeople = repPeople !== null ? repPeople - estPeople : null;
-    return { number: t.number, reported: !!rep, estLay, estMonk, estVol, estPeople, repLay, repMonk, repVol, repPeople, diffPeople };
+    return { number: t.number, name: t.name, reported: !!rep, estLay, estMonk, estVol, estPeople, repLay, repMonk, repVol, repPeople, diffPeople };
   });
 
   // 報名 / 實到 類別加總（不含便當）
@@ -349,11 +356,18 @@ function renderComparison() {
   const totRMonk = repRows.reduce((s,r) => s+r.repMonk, 0);
   const totRVol  = repRows.reduce((s,r) => s+r.repVol,  0);
   const totDiff  = (totRLay+totRMonk+totRVol) - (totELay+totEMonk+totEVol);
-  const sorted   = [...rows].sort((a,b) => a.number.localeCompare(b.number));
+  const totEPpl  = totELay + totEMonk + totEVol;
+  const totRPpl  = totRLay + totRMonk + totRVol;
+  const totRate  = totEPpl > 0 ? Math.round(totRPpl / totEPpl * 100) + '%' : '—';
+  let sorted = [...rows].sort((a,b) => a.number.localeCompare(b.number));
+  if (compSearch.trim()) {
+    const q = compSearch.trim().toLowerCase();
+    sorted = sorted.filter(r => r.name.toLowerCase().includes(q) || r.number.toLowerCase().includes(q));
+  }
 
   document.getElementById('comp-detail-body').innerHTML =
     sorted.map(r => `<tr${!r.reported?' class="unreported"':''}>
-      <td>${r.name}${!r.reported ? ' <span class="badge badge-wait" style="font-size:10px;">未回報</span>' : ''}</td>
+      <td><span style="color:var(--muted);font-size:12px;margin-right:4px;">${r.number}</span>${r.name}${!r.reported ? ' <span class="badge badge-wait" style="font-size:10px;">未回報</span>' : ''}</td>
       <td style="text-align:center;">${r.estLay}</td>
       <td style="text-align:center;">${r.estMonk}</td>
       <td style="text-align:center;">${r.estVol}</td>
@@ -361,12 +375,14 @@ function renderComparison() {
       <td style="text-align:center;">${r.reported ? r.repMonk : '—'}</td>
       <td style="text-align:center;">${r.reported ? r.repVol  : '—'}</td>
       <td style="text-align:center;">${diffFmt(r.diffPeople)}</td>
+      <td style="text-align:center;">${r.報到率||'—'}</td>
     </tr>`).join('') +
     `<tr style="background:#f0ede8;font-weight:700;border-top:2px solid var(--navy);">
       <td>合計（已回報 ${repRows.length}／${rows.length} 間）</td>
       <td style="text-align:center;">${totELay}</td><td style="text-align:center;">${totEMonk}</td><td style="text-align:center;">${totEVol}</td>
       <td style="text-align:center;">${totRLay}</td><td style="text-align:center;">${totRMonk}</td><td style="text-align:center;">${totRVol}</td>
       <td style="text-align:center;">${diffFmt(totDiff)}</td>
+      <td style="text-align:center;">${totRate}</td>
     </tr>`;
 }
 
@@ -391,15 +407,6 @@ function renderHall() {
   document.getElementById('hall-content').innerHTML = html + '</div>';
 }
 
-function renderTemple() {
-  const t = dashCache.總計;
-  document.getElementById('temple-body').innerHTML =
-    dashCache.templeRows.map(r =>
-      `<tr><td>${r.name}</td><td>${r.信眾}</td><td>${r.monk}</td><td>${r.volunteer}</td><td><strong>${r.total}</strong></td><td>${r.driver}</td><td>${r.reportedAt}</td></tr>`
-    ).join('') +
-    `<tr class="total-row"><td>合計</td><td>${t.信眾}</td><td>${t.monk}</td><td>${t.volunteer}</td><td>${t.total}</td><td>${t.driver}</td><td></td></tr>`
-    || '<tr><td colspan="7" class="empty-msg">尚無回報資料</td></tr>';
-}
 
 function renderMeal() {
   const c = dashCache;
