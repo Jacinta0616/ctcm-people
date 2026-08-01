@@ -360,13 +360,17 @@ async function fetchDashboard(actId) {
     const rep = repMap[t.number];
     const est = estMap[t.number];
     if (!rep) return;
-    totalSeatCount += est?.seat_count || 0;
     const 信眾 = (rep.vip||0) + rep.lay;
-    totalRepLayMonk += 信眾 + rep.monk;
+    const layMonk = 信眾 + rep.monk;
+    const seatCount = est?.seat_count || 0;
+    // 壇區佔用人數 = min(預設座位數, 信眾+法師)
+    const restCount = Math.min(seatCount, layMonk);
+    totalRepLayMonk += layMonk;
+    totalSeatCount  += restCount;
     const hall = restMap[t.number] || '（未分配）';
     if (!hallMap[hall]) hallMap[hall] = { count: 0, detail: [] };
-    hallMap[hall].count += 信眾 + rep.monk;
-    hallMap[hall].detail.push({ name: t.name, lay: 信眾, monk: rep.monk, sub: 信眾+rep.monk });
+    hallMap[hall].count += restCount;
+    hallMap[hall].detail.push({ name: t.name, lay: 信眾, monk: rep.monk, sub: restCount, total: layMonk });
   });
   const mainCount = totalRepLayMonk - totalSeatCount;
 
@@ -536,14 +540,20 @@ function renderHall() {
     <div class="hall-count">${c.mainCount} <span>人</span></div>
     <div class="detail-list">
       <div class="detail-row"><span>全場信眾+法師</span><span>${c.mainCount + c.totalSeatCount} 人</span></div>
-      <div class="detail-row"><span>預設座位數（各休息區）</span><span>－${c.totalSeatCount} 席</span></div>
+      <div class="detail-row"><span>壇區實際佔用</span><span>－${c.totalSeatCount} 人</span></div>
     </div></div>`;
   Object.entries(c.hallMap).forEach(([hall, v]) => {
     html += `<div class="hall-card">
       <div class="hall-title">📍 ${hall}</div>
       <div class="hall-count">${v.count} <span>人（信眾+法師）</span></div>`;
     if (v.detail.length) html += '<div class="detail-list">' +
-      v.detail.map(d => `<div class="detail-row"><span>${d.name}</span><span>眾 ${d.lay}＋師 ${d.monk} ＝ ${d.sub}</span></div>`).join('') +
+      v.detail.map(d => {
+        const capped = d.sub < d.total;
+        const right = capped
+          ? `眾 ${d.lay}＋師 ${d.monk} ＝ ${d.total}　→ 壇 <strong>${d.sub}</strong>`
+          : `眾 ${d.lay}＋師 ${d.monk} ＝ ${d.sub}`;
+        return `<div class="detail-row"><span>${d.name}</span><span>${right}</span></div>`;
+      }).join('') +
       '</div>';
     html += '</div>';
   });
