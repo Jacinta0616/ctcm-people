@@ -333,8 +333,17 @@ async function fetchDashboard(actId) {
   const repMap    = Object.fromEntries((repRes.data || []).map(r => [r.temple_number, r]));
   const pickupMap = Object.fromEntries((pickupRes.data || []).map(p => [p.temple_number, p.picked_up_at]));
 
+  // 過濾：只留有上傳預估資料（且非全零）或有設定休息區的精舍
+  const participatingTemples = temples.filter(t => {
+    const est = estMap[t.number];
+    const rest = restMap[t.number];
+    if (!est && !rest) return false;
+    if (rest) return true;
+    return !!(est.vip || est.lay || est.monk || est.volunteer || est.driver || est.seat_count);
+  });
+
   // 比較總覽（只計入有在精舍設定填入預估人數的精舍）
-  const compRows = temples.filter(t => estMap[t.number] !== undefined).map(t => {
+  const compRows = participatingTemples.filter(t => estMap[t.number] !== undefined).map(t => {
     const est = estMap[t.number];
     const rep = repMap[t.number];
     const estTotal = est ? (est.vip||0)+(est.lay||0)+est.monk+(est.volunteer||0)+est.driver : null;
@@ -356,7 +365,7 @@ async function fetchDashboard(actId) {
   const hallMap = {};
   let totalRepLayMonk = 0;
   let totalSeatCount  = 0;
-  temples.forEach(t => {
+  participatingTemples.forEach(t => {
     const rep = repMap[t.number];
     const est = estMap[t.number];
     if (!rep) return;
@@ -375,7 +384,7 @@ async function fetchDashboard(actId) {
   const mainCount = totalRepLayMonk - totalSeatCount;
 
   // 精舍視角
-  const templeRows = temples
+  const templeRows = participatingTemples
     .map(t => {
       const rep = repMap[t.number];
       if (!rep) return null;
@@ -395,7 +404,7 @@ async function fetchDashboard(actId) {
   const mealMap = {};
   let mealTotal = 0;
   let mealReturnTotal = 0;
-  temples.forEach(t => {
+  participatingTemples.forEach(t => {
     const rep = repMap[t.number];
     if (!rep) return;
     const hall = restMap[t.number] || '（未分配）';
@@ -574,7 +583,7 @@ function renderTemple() {
 /* ── 齋供視角 ── */
 function renderMeal() {
   const c = dashCache;
-  const entries = Object.entries(c.mealMap);
+  const entries = Object.entries(c.mealMap).filter(([hall]) => hall !== '（未分配）');
   if (!entries.length) {
     document.getElementById('meal-content').innerHTML = '<div class="empty-msg">尚無回報資料</div>';
     return;
