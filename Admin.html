@@ -143,6 +143,7 @@ tr.total-row td { background:#f0ede8; font-weight:700; border-top:2px solid var(
           <button class="tab-btn" onclick="switchTab('hall')">殿堂視角</button>
           <button class="tab-btn" onclick="switchTab('temple')">精舍視角</button>
           <button class="tab-btn" onclick="switchTab('meal')">齋供視角</button>
+          <button class="tab-btn" onclick="switchTab('transport')">交通視角</button>
         </div>
       </div>
       <div>
@@ -195,15 +196,19 @@ tr.total-row td { background:#f0ede8; font-weight:700; border-top:2px solid var(
       <div id="meal-content"><div class="empty-msg">請先選擇活動</div></div>
     </div>
 
+    <div id="tab-transport" class="tab-content">
+      <div id="transport-content"><div class="empty-msg">請先選擇活動</div></div>
+    </div>
+
     <div id="tab-temple" class="tab-content">
       <div style="margin-bottom:10px;">
         <button class="btn btn-sm" style="background:var(--navy);color:#fff;" onclick="openAdminReport(null)">＋ 代填回報</button>
       </div>
       <div class="table-wrap">
         <table><thead><tr>
-          <th>精舍</th><th>信眾</th><th>法師</th><th>義工</th><th>合計</th><th>便當數</th><th>回點數</th><th>回報時間</th><th></th>
+          <th>精舍</th><th>信眾</th><th>法師</th><th>義工</th><th>合計</th><th>便當數</th><th>大車數</th><th>回點數</th><th>晚到人數</th><th>晚到便當</th><th>回報時間</th><th></th>
         </tr></thead>
-        <tbody id="temple-body"><tr><td colspan="9" class="empty-msg">請先選擇活動</td></tr></tbody>
+        <tbody id="temple-body"><tr><td colspan="12" class="empty-msg">請先選擇活動</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -253,7 +258,7 @@ tr.total-row td { background:#f0ede8; font-weight:700; border-top:2px solid var(
         <button class="btn btn-outline btn-sm" onclick="document.getElementById('file-setup-single').click()">📤 單筆更新</button>
         <input type="file" id="file-setup" accept=".csv,.xlsx,.xls" style="display:none" onchange="handleUploadSetup(this)">
         <input type="file" id="file-setup-single" accept=".csv,.xlsx,.xls" style="display:none" onchange="handleUploadSetupSingle(this)">
-        <span class="upload-hint" id="setup-upload-hint">格式：精舍編號, 預估信眾/法師/義工/休息區人數/預設座位數/休息區說明（支援 Excel / CSV）｜上傳前請先選好活動並等預估人數列表載入</span>
+        <span class="upload-hint" id="setup-upload-hint">格式：精舍編號, 預估信眾/法師/義工/預設座位數/休息區說明（支援 Excel / CSV）｜上傳前請先選好活動並等預估人數列表載入</span>
       </div>
       <div class="setup-toolbar">
         <button class="btn btn-success" id="btn-save-setup" onclick="doSaveSetup()">儲存全部</button>
@@ -262,9 +267,9 @@ tr.total-row td { background:#f0ede8; font-weight:700; border-top:2px solid var(
       </div>
       <div class="table-wrap">
         <table><thead><tr>
-          <th>#</th><th>精舍名稱</th><th>預估信眾</th><th>預估法師</th><th>預估義工</th><th>休息區人數</th><th>預設座位數</th><th>休息區說明</th>
+          <th>#</th><th>精舍名稱</th><th>預估信眾</th><th>預估法師</th><th>預估義工</th><th>預設座位數</th><th>休息區說明</th>
         </tr></thead>
-        <tbody id="setup-body"><tr><td colspan="8" class="empty-msg">請先選擇活動</td></tr></tbody>
+        <tbody id="setup-body"><tr><td colspan="7" class="empty-msg">請先選擇活動</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -421,13 +426,16 @@ async function fetchDashboard(actId) {
       const 信眾 = (rep.vip||0) + rep.lay;
       const volunteer = rep.volunteer || 0;
       return { number: t.number, name: t.name, 信眾, monk: rep.monk, volunteer, driver: rep.driver,
+               bigCar: rep.big_car || 0,
                returnCount: rep.return_count || 0,
+               lateArrival: rep.late_arrival || 0,
+               lateBento: rep.late_bento || 0,
                total: 信眾+rep.monk+volunteer,
                reportedAt: new Date(rep.reported_at).toLocaleString('zh-TW',{timeZone:'Asia/Taipei'}) };
     }).filter(Boolean);
   const 總計 = templeRows.reduce(
-    (a, r) => ({ 信眾:a.信眾+r.信眾, monk:a.monk+r.monk, volunteer:a.volunteer+r.volunteer, driver:a.driver+r.driver, returnCount:a.returnCount+r.returnCount, total:a.total+r.total }),
-    { 信眾:0, monk:0, volunteer:0, driver:0, returnCount:0, total:0 }
+    (a, r) => ({ 信眾:a.信眾+r.信眾, monk:a.monk+r.monk, volunteer:a.volunteer+r.volunteer, driver:a.driver+r.driver, bigCar:a.bigCar+r.bigCar, returnCount:a.returnCount+r.returnCount, lateArrival:a.lateArrival+r.lateArrival, lateBento:a.lateBento+r.lateBento, total:a.total+r.total }),
+    { 信眾:0, monk:0, volunteer:0, driver:0, bigCar:0, returnCount:0, lateArrival:0, lateBento:0, total:0 }
   );
 
   // 齋供視角（依殿堂加總便當數 + 回點數 + 領取狀態）
@@ -440,7 +448,8 @@ async function fetchDashboard(actId) {
     const hall = restMap[t.number] || '（未分配）';
     const seatCount = estMap[t.number]?.seat_count || 0;
     if (!mealMap[hall]) mealMap[hall] = { count: 0, returnCount: 0, seatCount: 0, detail: [] };
-    mealMap[hall].count += rep.driver;
+    const hallBento = rep.driver + (rep.late_bento || 0);
+    mealMap[hall].count += hallBento;
     mealMap[hall].returnCount += rep.return_count || 0;
     mealMap[hall].seatCount += seatCount;
     const pickedUp = !!pickupMap[t.number];
@@ -449,10 +458,10 @@ async function fetchDashboard(actId) {
       : null;
     mealMap[hall].detail.push({
       name: t.name, number: t.number,
-      count: rep.driver, returnCount: rep.return_count || 0,
+      count: hallBento, returnCount: rep.return_count || 0,
       seatCount, pickedUp, pickedUpAt
     });
-    mealTotal += rep.driver;
+    mealTotal += hallBento;
     mealReturnTotal += rep.return_count || 0;
   });
 
@@ -481,7 +490,7 @@ function refreshData() {
 }
 
 /* ── 分頁切換 ── */
-const ALL_TABS = ['comparison','hall','temple','meal','activity','setup','temples'];
+const ALL_TABS = ['comparison','hall','temple','meal','transport','activity','setup','temples'];
 
 function switchTab(tab) {
   currentTab = tab;
@@ -502,8 +511,36 @@ function renderCurrentTab() {
   if (currentTab === 'comparison') renderComparison();
   else if (currentTab === 'hall')   renderHall();
   else if (currentTab === 'temple') renderTemple();
-  else if (currentTab === 'meal')   renderMeal();
-  else if (currentTab === 'setup')  renderSetup();
+  else if (currentTab === 'meal')      renderMeal();
+  else if (currentTab === 'transport') renderTransport();
+  else if (currentTab === 'setup')     renderSetup();
+}
+
+/* ── 交通視角 ── */
+function renderTransport() {
+  const rows = dashCache.templeRows;
+  const total = dashCache.總計.bigCar;
+  const el = document.getElementById('transport-content');
+  if (!rows.length) { el.innerHTML = '<div class="empty-msg">尚無回報資料</div>'; return; }
+  el.innerHTML = `
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th>精舍</th>
+          <th style="text-align:center;">大車數（台）</th>
+        </tr></thead>
+        <tbody>
+          ${rows.map(r => `<tr>
+            <td><span style="color:var(--muted);font-size:12px;margin-right:4px;">${r.number}</span>${r.name}</td>
+            <td style="text-align:center;font-size:20px;font-weight:700;color:var(--navy);">${r.bigCar}</td>
+          </tr>`).join('')}
+          <tr class="total-row">
+            <td>合計</td>
+            <td style="text-align:center;font-size:20px;">${total}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>`;
 }
 
 /* ── 比較總覽 ── */
@@ -625,7 +662,7 @@ function renderHall() {
       <div class="hall-title">📍 ${hall}</div>
       <div class="hall-count">${v.count} <span>人（信眾+法師）</span></div>`;
     if (v.detail.length) html += '<div class="detail-list">' +
-      v.detail.map(d => `<div class="detail-row"><span>${d.name}</span><span>眾 ${d.lay}＋師 ${d.monk} ＝ ${d.sub}</span></div>`).join('') +
+      v.detail.map(d => `<div class="detail-row"><span>${d.name}</span><span>眾 ${d.lay}＋師 ${d.monk} → ${d.sub}</span></div>`).join('') +
       '</div>';
     html += '</div>';
   });
@@ -641,13 +678,14 @@ function renderTemple() {
       ? rows.map(r =>
           `<tr>
             <td>${r.name}</td><td>${r.信眾}</td><td>${r.monk}</td><td>${r.volunteer}</td>
-            <td><strong>${r.total}</strong></td><td>${r.driver}</td><td>${r.returnCount}</td>
+            <td><strong>${r.total}</strong></td><td>${r.driver}</td><td>${r.bigCar}</td><td>${r.returnCount}</td>
+            <td>${r.lateArrival || 0}</td><td>${r.lateBento || 0}</td>
             <td style="font-size:12px;color:var(--muted);">${r.reportedAt}</td>
             <td><button class="btn btn-sm btn-outline" style="padding:3px 10px;font-size:12px;"
                 onclick="openAdminReport('${r.number}')">修改</button></td>
           </tr>`).join('')
-      : '<tr><td colspan="9" class="empty-msg">尚無回報資料</td></tr>') +
-    `<tr class="total-row"><td>合計</td><td>${t.信眾}</td><td>${t.monk}</td><td>${t.volunteer}</td><td>${t.total}</td><td>${t.driver}</td><td>${t.returnCount}</td><td></td><td></td></tr>`;
+      : '<tr><td colspan="12" class="empty-msg">尚無回報資料</td></tr>') +
+    `<tr class="total-row"><td>合計</td><td>${t.信眾}</td><td>${t.monk}</td><td>${t.volunteer}</td><td>${t.total}</td><td>${t.driver}</td><td>${t.bigCar}</td><td>${t.returnCount}</td><td>${t.lateArrival}</td><td>${t.lateBento}</td><td></td><td></td></tr>`;
 }
 
 /* ── 齋供視角 ── */
@@ -786,6 +824,14 @@ async function deleteActivity(actId, actName) {
 }
 
 /* ── 後台代填 / 修改回報 ── */
+function arCalcReturn() {
+  const lay     = parseInt(document.getElementById('ar-lay').value)          || 0;
+  const monk    = parseInt(document.getElementById('ar-monk').value)         || 0;
+  const bigCar  = parseInt(document.getElementById('ar-bigcar').value)       || 0;
+  const lateArr = parseInt(document.getElementById('ar-late-arrival').value) || 0;
+  document.getElementById('ar-return').value = lay + monk + bigCar + lateArr;
+}
+
 function openAdminReport(templeNumber) {
   const c = dashCache;
   if (!c) return;
@@ -812,12 +858,15 @@ function openAdminReport(templeNumber) {
     // 預填已回報數據
     const rep = c.templeRows.find(r => r.number === templeNumber);
     if (rep) {
-      document.getElementById('ar-lay').value      = rep.信眾;
-      document.getElementById('ar-monk').value     = rep.monk;
-      document.getElementById('ar-vol').value      = rep.volunteer;
-      document.getElementById('ar-driver').value   = rep.driver;
-      document.getElementById('ar-return').value   = rep.returnCount;
-      document.getElementById('ar-name').textContent = rep.name;
+      document.getElementById('ar-lay').value          = rep.信眾;
+      document.getElementById('ar-monk').value         = rep.monk;
+      document.getElementById('ar-vol').value          = rep.volunteer;
+      document.getElementById('ar-driver').value       = rep.driver;
+      document.getElementById('ar-bigcar').value       = rep.bigCar;
+      document.getElementById('ar-return').value       = rep.returnCount;
+      document.getElementById('ar-late-arrival').value = rep.lateArrival || 0;
+      document.getElementById('ar-late-bento').value   = rep.lateBento   || 0;
+      document.getElementById('ar-name').textContent   = rep.name;
     }
   }
 
@@ -827,26 +876,33 @@ function openAdminReport(templeNumber) {
 
 function prefillFromEst(num) {
   const est = dashCache.setupRows.find(r => r.number === num) || {};
-  document.getElementById('ar-lay').value    = est.lay    || 0;
-  document.getElementById('ar-monk').value   = est.monk   || 0;
-  document.getElementById('ar-vol').value    = est.volunteer || 0;
-  document.getElementById('ar-driver').value = est.driver || 0;
-  document.getElementById('ar-return').value = 0;
-  document.getElementById('ar-name').textContent = '';
+  document.getElementById('ar-lay').value          = est.lay    || 0;
+  document.getElementById('ar-monk').value         = est.monk   || 0;
+  document.getElementById('ar-vol').value          = est.volunteer || 0;
+  document.getElementById('ar-driver').value       = est.driver || 0;
+  document.getElementById('ar-bigcar').value       = 0;
+  document.getElementById('ar-late-arrival').value = 0;
+  document.getElementById('ar-late-bento').value   = 0;
+  document.getElementById('ar-return').value       = (est.lay||0) + (est.monk||0);
+  document.getElementById('ar-name').textContent   = '';
 }
 
 async function submitAdminReport() {
   const num       = document.getElementById('ar-temple-sel').value;
-  const lay       = parseInt(document.getElementById('ar-lay').value)    || 0;
-  const monk      = parseInt(document.getElementById('ar-monk').value)   || 0;
-  const volunteer = parseInt(document.getElementById('ar-vol').value)    || 0;
-  const driver    = parseInt(document.getElementById('ar-driver').value) || 0;
-  const returnCnt = parseInt(document.getElementById('ar-return').value) || 0;
+  const lay         = parseInt(document.getElementById('ar-lay').value)          || 0;
+  const monk        = parseInt(document.getElementById('ar-monk').value)         || 0;
+  const volunteer   = parseInt(document.getElementById('ar-vol').value)          || 0;
+  const driver      = parseInt(document.getElementById('ar-driver').value)       || 0;
+  const bigCar      = parseInt(document.getElementById('ar-bigcar').value)       || 0;
+  const lateArrival = parseInt(document.getElementById('ar-late-arrival').value) || 0;
+  const lateBento   = parseInt(document.getElementById('ar-late-bento').value)   || 0;
+  const returnCnt   = lay + monk + bigCar + lateArrival;
   if (!num) { document.getElementById('ar-err').textContent = '請選擇精舍'; return; }
 
   const { error } = await sb.from('reports').upsert({
     event_id: dashCache.actId, temple_number: num,
-    vip: 0, lay, monk, volunteer, driver,
+    vip: 0, lay, monk, volunteer, driver, big_car: bigCar,
+    late_arrival: lateArrival, late_bento: lateBento,
     return_count: returnCnt,
     reported_at: new Date().toISOString()
   }, { onConflict: 'event_id,temple_number' });
@@ -918,11 +974,10 @@ function renderSetup() {
       <td><input type="number" class="setup-num" data-f="lay"       min="0" value="${r.lay}"></td>
       <td><input type="number" class="setup-num" data-f="monk"      min="0" value="${r.monk}"></td>
       <td><input type="number" class="setup-num" data-f="volunteer" min="0" value="${r.volunteer||0}"></td>
-      <td><input type="number" class="setup-num" data-f="driver"    min="0" value="${r.driver}"></td>
       <td><input type="number" class="setup-num" data-f="seat_count" min="0" value="${r.seat_count||0}"></td>
       <td><input type="text" class="setup-text" data-f="rest" value="${esc(r.rest)}"></td>
     </tr>`
-  ).join('') || '<tr><td colspan="8" class="empty-msg">精舍名單為空</td></tr>';
+  ).join('') || '<tr><td colspan="7" class="empty-msg">精舍名單為空</td></tr>';
 }
 
 async function doSaveSetup() {
@@ -934,16 +989,15 @@ async function doSaveSetup() {
     const lay        = parseInt(tr.querySelector('[data-f="lay"]').value)        || 0;
     const monk       = parseInt(tr.querySelector('[data-f="monk"]').value)       || 0;
     const volunteer  = parseInt(tr.querySelector('[data-f="volunteer"]').value)  || 0;
-    const driver     = parseInt(tr.querySelector('[data-f="driver"]').value)     || 0;
     const seat_count = parseInt(tr.querySelector('[data-f="seat_count"]').value) || 0;
     const rest       = tr.querySelector('[data-f="rest"]').value.trim();
-    rows.push({ event_id: actId, temple_number: num, vip:0, lay, monk, volunteer, driver, seat_count });
+    rows.push({ event_id: actId, temple_number: num, vip:0, lay, monk, volunteer, driver:0, seat_count });
     if (rest) { rows[rows.length-1]._rest = rest; }
   });
   if (!rows.length) { alert('沒有資料可儲存'); return; }
   setBtn('btn-save-setup', true, '儲存中…');
 
-  const estRows   = rows.map(r => ({ event_id:r.event_id, temple_number:r.temple_number, vip:0, lay:r.lay, monk:r.monk, volunteer:r.volunteer, driver:r.driver, seat_count:r.seat_count }));
+  const estRows   = rows.map(r => ({ event_id:r.event_id, temple_number:r.temple_number, vip:0, lay:r.lay, monk:r.monk, volunteer:r.volunteer, driver:0, seat_count:r.seat_count }));
   const restRows  = rows.filter(r => r._rest).map(r => ({ event_id:r.event_id, temple_number:r.temple_number, description:r._rest }));
   const clearNums = rows.filter(r => !r._rest).map(r => r.temple_number);
 
@@ -1007,7 +1061,6 @@ async function copyFromPrevEvent() {
       tr.querySelector('[data-f="lay"]').value        = (est.vip||0) + (est.lay||0);
       tr.querySelector('[data-f="monk"]').value       = est.monk;
       tr.querySelector('[data-f="volunteer"]').value  = est.volunteer || 0;
-      tr.querySelector('[data-f="driver"]').value     = est.driver;
       tr.querySelector('[data-f="seat_count"]').value = est.seat_count || 0;
       filled++;
     }
@@ -1181,15 +1234,15 @@ async function dlTemplateSetup() {
   const navy = { type:'pattern', pattern:'solid', fgColor:{ argb:'FF2D4A6E' } };
   const bdr  = { style:'thin', color:{ argb:'FFD0D0D0' } };
   const border = { top:bdr, bottom:bdr, left:bdr, right:bdr };
-  const hdr = ws.addRow(['精舍編號','精舍名稱','預估信眾','預估法師','預估義工','休息區人數','預設座位數','休息區說明']);
+  const hdr = ws.addRow(['精舍編號','精舍名稱','預估信眾','預估法師','預估義工','預設座位數','休息區說明']);
   hdr.height = 22;
   hdr.eachCell(c => { c.fill = navy; c.font = { bold:true, color:{ argb:'FFFFFFFF' }, size:11 }; c.alignment = { horizontal:'center', vertical:'middle' }; c.border = border; });
   dashCache.setupRows.forEach(r => {
-    const row = ws.addRow([r.number, r.name, r.lay, r.monk, r.volunteer||0, r.driver, r.seat_count||0, r.rest]); row.height = 20;
+    const row = ws.addRow([r.number, r.name, r.lay, r.monk, r.volunteer||0, r.seat_count||0, r.rest]); row.height = 20;
     row.eachCell(c => { c.border = border; c.alignment = { vertical:'middle' }; });
     row.getCell(1).numFmt = '@'; // 精舍編號欄強制文字，保留前置零
   });
-  [10, 18, 10, 10, 10, 10, 10, 30].forEach((w, i) => ws.getColumn(i+1).width = w);
+  [10, 18, 10, 10, 10, 10, 30].forEach((w, i) => ws.getColumn(i+1).width = w);
   triggerXlDownload(await wb.xlsx.writeBuffer(), '精舍設定範本.xlsx');
 }
 
@@ -1199,7 +1252,7 @@ async function handleUploadSetup(input) {
   input.value = '';
   if (!rows.length) return;
   const headers = rows[0].map(h => h.trim().replace(/^﻿/, ''));
-  const need = ['精舍編號','預估信眾','預估法師','預估義工','休息區人數','預設座位數','休息區說明'];
+  const need = ['精舍編號','預估信眾','預估法師','預估義工','預設座位數','休息區說明'];
   if (!need.every(h => headers.includes(h))) {
     alert('欄位格式不符，請確認標題列包含：' + need.join('、'));
     return;
@@ -1245,7 +1298,6 @@ async function handleUploadSetup(input) {
     tr.querySelector('[data-f="lay"]').value        = parseInt(r[hi('預估信眾')])||0;
     tr.querySelector('[data-f="monk"]').value       = parseInt(r[hi('預估法師')])||0;
     tr.querySelector('[data-f="volunteer"]').value  = parseInt(r[hi('預估義工')])||0;
-    tr.querySelector('[data-f="driver"]').value     = parseInt(r[hi('休息區人數')])||0;
     tr.querySelector('[data-f="seat_count"]').value = parseInt(r[hi('預設座位數')])||0;
     tr.querySelector('[data-f="rest"]').value       = r[hi('休息區說明')]||'';
     filled++;
@@ -1291,7 +1343,7 @@ async function handleUploadSetupSingle(input) {
   if (!actId) { alert('請先選擇活動'); return; }
 
   const headers = rows[0].map(h => h.trim().replace(/^﻿/, ''));
-  const need = ['精舍編號','預估信眾','預估法師','預估義工','休息區人數','預設座位數','休息區說明'];
+  const need = ['精舍編號','預估信眾','預估法師','預估義工','預設座位數','休息區說明'];
   if (!need.every(h => headers.includes(h))) {
     alert('欄位格式不符，請確認標題列包含：' + need.join('、'));
     return;
@@ -1318,7 +1370,7 @@ async function handleUploadSetupSingle(input) {
       lay:        parseInt(r[hi('預估信眾')])  || 0,
       monk:       parseInt(r[hi('預估法師')])  || 0,
       volunteer:  parseInt(r[hi('預估義工')])  || 0,
-      driver:     parseInt(r[hi('休息區人數')]) || 0,
+      driver:     0,
       seat_count: parseInt(r[hi('預設座位數')]) || 0
     });
     const rest = (r[hi('休息區說明')] || '').trim();
@@ -1705,17 +1757,25 @@ async function downloadExcel() {
       style="width:100%;padding:9px 10px;border:2px solid #ddd;border-radius:8px;font-size:14px;margin-bottom:14px;"></select>
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:10px;">
       <div><label style="font-size:12px;color:var(--muted);">參加法會人數</label>
-        <input id="ar-lay" type="number" min="0" style="width:100%;padding:8px;border:2px solid #ddd;border-radius:8px;font-size:15px;text-align:center;"></div>
+        <input id="ar-lay" type="number" min="0" style="width:100%;padding:8px;border:2px solid #ddd;border-radius:8px;font-size:15px;text-align:center;" oninput="arCalcReturn()"></div>
       <div><label style="font-size:12px;color:var(--muted);">法師</label>
-        <input id="ar-monk" type="number" min="0" style="width:100%;padding:8px;border:2px solid #ddd;border-radius:8px;font-size:15px;text-align:center;"></div>
+        <input id="ar-monk" type="number" min="0" style="width:100%;padding:8px;border:2px solid #ddd;border-radius:8px;font-size:15px;text-align:center;" oninput="arCalcReturn()"></div>
       <div><label style="font-size:12px;color:var(--muted);">義工</label>
         <input id="ar-vol" type="number" min="0" style="width:100%;padding:8px;border:2px solid #ddd;border-radius:8px;font-size:15px;text-align:center;"></div>
     </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:18px;">
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:10px;">
       <div><label style="font-size:12px;color:var(--muted);">便當數</label>
         <input id="ar-driver" type="number" min="0" style="width:100%;padding:8px;border:2px solid #ddd;border-radius:8px;font-size:15px;text-align:center;"></div>
-      <div><label style="font-size:12px;color:var(--muted);">回點數</label>
-        <input id="ar-return" type="number" min="0" style="width:100%;padding:8px;border:2px solid #ddd;border-radius:8px;font-size:15px;text-align:center;"></div>
+      <div><label style="font-size:12px;color:var(--muted);">大車數</label>
+        <input id="ar-bigcar" type="number" min="0" style="width:100%;padding:8px;border:2px solid #ddd;border-radius:8px;font-size:15px;text-align:center;" oninput="arCalcReturn()"></div>
+      <div><label style="font-size:12px;color:var(--muted);">回點數（自動）</label>
+        <input id="ar-return" type="number" readonly style="width:100%;padding:8px;border:2px solid #ddd;border-radius:8px;font-size:15px;text-align:center;background:#f5f5f5;color:#888;"></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:18px;">
+      <div><label style="font-size:12px;color:var(--muted);">晚到人數</label>
+        <input id="ar-late-arrival" type="number" min="0" value="0" style="width:100%;padding:8px;border:2px solid #ddd;border-radius:8px;font-size:15px;text-align:center;" oninput="arCalcReturn()"></div>
+      <div><label style="font-size:12px;color:var(--muted);">晚到便當數</label>
+        <input id="ar-late-bento" type="number" min="0" value="0" style="width:100%;padding:8px;border:2px solid #ddd;border-radius:8px;font-size:15px;text-align:center;"></div>
     </div>
     <div id="ar-err" style="color:var(--danger);font-size:13px;margin-bottom:10px;min-height:18px;"></div>
     <div style="display:flex;gap:10px;">

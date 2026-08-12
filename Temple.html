@@ -148,8 +148,18 @@ header p  { font-size:13px; opacity:.75; margin-top:2px; }
           <input type="number" id="f-driver" min="0" value="0" oninput="calcTotal()">
         </div>
         <div class="inp-group">
-          <label>回點數 <span style="font-size:11px;color:#bbb;font-weight:400;">(回程－義工)</span></label>
-          <input type="number" id="f-return-count" min="0" value="0" oninput="calcTotal()">
+          <label>大車數 <span style="font-size:11px;color:#bbb;font-weight:400;">(遊覽車台數)</span></label>
+          <input type="number" id="f-bigcar" min="0" value="0" oninput="calcTotal()">
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:0 0 10px;">
+        <div class="inp-group">
+          <label>晚到人數 <span style="font-size:11px;color:#bbb;font-weight:400;">(後來才搭車上山)</span></label>
+          <input type="number" id="f-late-arrival" min="0" value="0" oninput="calcTotal()">
+        </div>
+        <div class="inp-group">
+          <label>晚到便當數</label>
+          <input type="number" id="f-late-bento" min="0" value="0" oninput="calcTotal()">
         </div>
       </div>
       <div class="inp-group" style="margin-bottom:10px;">
@@ -162,12 +172,26 @@ header p  { font-size:13px; opacity:.75; margin-top:2px; }
       </div>
       <div style="display:flex;gap:0;margin-top:10px;padding-top:10px;border-top:1px dashed #ddd;">
         <div class="total-row" style="flex:1;margin:0;padding:0;">
-          <span style="font-size:15px;color:var(--muted);">便當數</span>
-          <span style="font-size:26px;font-weight:800;color:var(--muted);" id="driver-display">0</span>
+          <span style="font-size:14px;color:var(--muted);">便當數</span>
+          <span style="font-size:24px;font-weight:800;color:var(--muted);" id="driver-display">0</span>
         </div>
         <div class="total-row" style="flex:1;margin:0;padding:0;border-left:1px dashed #ddd;">
-          <span style="font-size:15px;color:var(--muted);">回點數</span>
-          <span style="font-size:26px;font-weight:800;color:var(--muted);" id="return-count-display">0</span>
+          <span style="font-size:14px;color:var(--muted);">大車數</span>
+          <span style="font-size:24px;font-weight:800;color:var(--muted);" id="bigcar-display">0</span>
+        </div>
+        <div class="total-row" style="flex:1;margin:0;padding:0;border-left:1px dashed #ddd;">
+          <span style="font-size:14px;color:var(--muted);">回點數<br><span style="font-size:10px;">(自動)</span></span>
+          <span style="font-size:24px;font-weight:800;color:var(--navy);" id="return-count-display">0</span>
+        </div>
+      </div>
+      <div style="display:flex;gap:0;margin-top:6px;padding-top:8px;border-top:1px dashed #ddd;">
+        <div class="total-row" style="flex:1;margin:0;padding:0;">
+          <span style="font-size:14px;color:var(--muted);">晚到人數</span>
+          <span style="font-size:24px;font-weight:800;color:var(--muted);" id="late-arrival-display">0</span>
+        </div>
+        <div class="total-row" style="flex:1;margin:0;padding:0;border-left:1px dashed #ddd;">
+          <span style="font-size:14px;color:var(--muted);">晚到便當</span>
+          <span style="font-size:24px;font-weight:800;color:var(--muted);" id="late-bento-display">0</span>
         </div>
       </div>
       <button class="btn" id="btn-submit" onclick="doSubmit()" style="margin-top:14px;">送出回報</button>
@@ -301,7 +325,7 @@ function renderMain(rest, est, prev) {
 
   if (est) {
     document.getElementById('est-card').style.display = 'block';
-    document.getElementById('est-mini').innerHTML = miniGrid((est.vip||0)+(est.lay||0), est.monk, est.volunteer||0, est.driver, 0);
+    document.getElementById('est-mini').innerHTML = miniGrid((est.vip||0)+(est.lay||0), est.monk, est.volunteer||0, est.driver, 0, 0);
   }
 
   if (prev) {
@@ -309,36 +333,47 @@ function renderMain(rest, est, prev) {
       .toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' });
     document.getElementById('prev-card').style.display = 'block';
     document.getElementById('prev-time-text').textContent = '回報時間：' + timeStr;
-    document.getElementById('prev-mini').innerHTML = miniGrid((prev.vip||0)+prev.lay, prev.monk, prev.volunteer||0, prev.driver, prev.return_count||0);
-    document.getElementById('f-lay').value        = (prev.vip||0) + prev.lay;
-    document.getElementById('f-monk').value       = prev.monk;
-    document.getElementById('f-volunteer').value  = prev.volunteer || 0;
+    document.getElementById('prev-mini').innerHTML = miniGrid((prev.vip||0)+prev.lay, prev.monk, prev.volunteer||0, prev.driver, prev.big_car||0, prev.return_count||0, prev.late_arrival||0, prev.late_bento||0);
+    document.getElementById('f-lay').value          = (prev.vip||0) + prev.lay;
+    document.getElementById('f-monk').value         = prev.monk;
+    document.getElementById('f-volunteer').value    = prev.volunteer || 0;
     document.getElementById('f-driver').value       = prev.driver;
-    document.getElementById('f-return-count').value = prev.return_count || 0;
-    document.getElementById('f-note').value          = prev.note || '';
+    document.getElementById('f-bigcar').value       = prev.big_car || 0;
+    document.getElementById('f-late-arrival').value = prev.late_arrival || 0;
+    document.getElementById('f-late-bento').value   = prev.late_bento   || 0;
+    document.getElementById('f-note').value         = prev.note || '';
     calcTotal();
   }
   show('screen-main');
 }
 
 function calcTotal() {
-  const t = ['f-lay','f-monk','f-volunteer']
-    .reduce((acc, id) => acc + (parseInt(document.getElementById(id).value) || 0), 0);
-  document.getElementById('total-num').textContent = t;
-  document.getElementById('driver-display').textContent = parseInt(document.getElementById('f-driver').value) || 0;
-  document.getElementById('return-count-display').textContent = parseInt(document.getElementById('f-return-count').value) || 0;
+  const lay     = parseInt(document.getElementById('f-lay').value)          || 0;
+  const monk    = parseInt(document.getElementById('f-monk').value)         || 0;
+  const vol     = parseInt(document.getElementById('f-volunteer').value)    || 0;
+  const bigCar  = parseInt(document.getElementById('f-bigcar').value)       || 0;
+  const lateArr = parseInt(document.getElementById('f-late-arrival').value) || 0;
+  document.getElementById('total-num').textContent            = lay + monk + vol;
+  document.getElementById('driver-display').textContent       = parseInt(document.getElementById('f-driver').value) || 0;
+  document.getElementById('bigcar-display').textContent       = bigCar;
+  document.getElementById('return-count-display').textContent = lay + monk + bigCar + lateArr;
+  document.getElementById('late-arrival-display').textContent = lateArr;
+  document.getElementById('late-bento-display').textContent   = parseInt(document.getElementById('f-late-bento').value) || 0;
 }
 
 async function doSubmit() {
-  const vip       = 0;
-  const lay       = parseInt(document.getElementById('f-lay').value)       || 0;
-  const monk      = parseInt(document.getElementById('f-monk').value)      || 0;
-  const volunteer = parseInt(document.getElementById('f-volunteer').value) || 0;
+  const vip         = 0;
+  const lay         = parseInt(document.getElementById('f-lay').value)          || 0;
+  const monk        = parseInt(document.getElementById('f-monk').value)         || 0;
+  const volunteer   = parseInt(document.getElementById('f-volunteer').value)    || 0;
   const driver      = parseInt(document.getElementById('f-driver').value)       || 0;
-  const returnCount = parseInt(document.getElementById('f-return-count').value) || 0;
+  const bigCar      = parseInt(document.getElementById('f-bigcar').value)       || 0;
+  const lateArrival = parseInt(document.getElementById('f-late-arrival').value) || 0;
+  const lateBento   = parseInt(document.getElementById('f-late-bento').value)   || 0;
+  const returnCount = lay + monk + bigCar + lateArrival;
   const note        = document.getElementById('f-note').value;
 
-  if ((lay + monk + volunteer + driver + returnCount) === 0 && !confirm('總人數為 0，確定要送出嗎？')) return;
+  if ((lay + monk + volunteer + driver + bigCar + lateArrival) === 0 && !confirm('總人數為 0，確定要送出嗎？')) return;
 
   setBtn('btn-submit', true, '送出中…');
 
@@ -346,7 +381,9 @@ async function doSubmit() {
     event_id:      S.活動ID,
     temple_number: S.精舍編號,
     reported_at:   new Date().toISOString(),
-    vip, lay, monk, volunteer, driver, return_count: returnCount,
+    vip, lay, monk, volunteer, driver, big_car: bigCar,
+    late_arrival: lateArrival, late_bento: lateBento,
+    return_count: returnCount,
     note: note || ''
   }, { onConflict: 'event_id,temple_number' });
 
@@ -355,7 +392,7 @@ async function doSubmit() {
 
   const now = new Date().toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' });
   document.getElementById('success-time').textContent = '回報時間：' + now;
-  document.getElementById('success-mini').innerHTML = miniGrid(lay, monk, volunteer, driver, returnCount);
+  document.getElementById('success-mini').innerHTML = miniGrid(lay, monk, volunteer, driver, bigCar, returnCount, lateArrival, lateBento);
   show('screen-success');
 }
 
@@ -371,15 +408,21 @@ function setBtn(id, disabled, text) {
   b.disabled = disabled; b.textContent = text;
 }
 
-function miniGrid(lay, monk, volunteer, driver, returnCount) {
+function miniGrid(lay, monk, volunteer, driver, bigCar, returnCount, lateArrival, lateBento) {
   const grid = ['信眾','法師','義工'].map((l, i) =>
     `<div class="mini-item"><div class="n">${[lay,monk,volunteer][i]}</div><div class="l">${l}</div></div>`
   ).join('');
+  const lateRow = (lateArrival || lateBento)
+    ? `<div class="driver-row" style="display:flex;justify-content:space-between;padding:4px 0;gap:8px;border-top:1px dashed #eee;margin-top:4px;">
+        <span style="font-size:12px;color:var(--muted);">晚到人數 <strong style="font-size:16px;font-weight:700;color:var(--navy);">${lateArrival||0}</strong></span>
+        <span style="font-size:12px;color:var(--muted);">晚到便當 <strong style="font-size:16px;font-weight:700;color:var(--navy);">${lateBento||0}</strong></span>
+      </div>` : '';
   return `<div class="mini-grid">${grid}</div>
-    <div class="driver-row" style="display:flex;justify-content:space-between;padding:6px 0;">
+    <div class="driver-row" style="display:flex;justify-content:space-between;padding:6px 0;gap:8px;">
       <span style="font-size:12px;color:var(--muted);">便當數 <strong style="font-size:16px;font-weight:700;color:var(--navy);">${driver}</strong></span>
+      <span style="font-size:12px;color:var(--muted);">大車數 <strong style="font-size:16px;font-weight:700;color:var(--navy);">${bigCar||0}</strong></span>
       <span style="font-size:12px;color:var(--muted);">回點數 <strong style="font-size:16px;font-weight:700;color:var(--navy);">${returnCount||0}</strong></span>
-    </div>`;
+    </div>${lateRow}`;
 }
 </script>
 </body>
