@@ -124,6 +124,7 @@ header p  { font-size:13px; opacity:.75; margin-top:2px; }
     <div class="card" style="background:var(--navy-light);">
       <div class="card-label">休息區位置</div>
       <div class="card-value" id="rest-area" style="font-size:22px;line-height:1.35;">—</div>
+      <div id="seat-count-row" style="display:none;margin-top:6px;font-size:13px;color:var(--navy);opacity:.75;">預設座位數：<strong id="seat-count-val">0</strong> 席</div>
     </div>
     <div class="card" id="est-card" style="display:none;">
       <span class="prev-tag" style="background:#e8f0fb;color:#2d4a6e;">本場報名人數</span>
@@ -283,7 +284,7 @@ async function selectEvent(eventId, eventName) {
   const [restRes, estRes, repRes] = await Promise.all([
     sb.from('rest_areas').select('description')
       .eq('event_id', eventId).eq('temple_number', S.精舍編號).maybeSingle(),
-    sb.from('estimates').select('vip,lay,monk,volunteer,driver')
+    sb.from('estimates').select('vip,lay,monk,volunteer,driver,seat_count')
       .eq('event_id', eventId).eq('temple_number', S.精舍編號).maybeSingle(),
     sb.from('reports').select('*')
       .eq('event_id', eventId).eq('temple_number', S.精舍編號).maybeSingle()
@@ -304,7 +305,7 @@ async function loadPageData() {
   const [restRes, estRes, repRes] = await Promise.all([
     sb.from('rest_areas').select('description')
       .eq('event_id', S.活動ID).eq('temple_number', S.精舍編號).maybeSingle(),
-    sb.from('estimates').select('vip,lay,monk,volunteer,driver')
+    sb.from('estimates').select('vip,lay,monk,volunteer,driver,seat_count')
       .eq('event_id', S.活動ID).eq('temple_number', S.精舍編號).maybeSingle(),
     sb.from('reports').select('*')
       .eq('event_id', S.活動ID).eq('temple_number', S.精舍編號).maybeSingle()
@@ -314,10 +315,17 @@ async function loadPageData() {
 
 function renderMain(rest, est, prev) {
   document.getElementById('rest-area').textContent = rest?.description || '（尚未分配）';
+  const seatCount = est?.seat_count || 0;
+  if (seatCount > 0) {
+    document.getElementById('seat-count-val').textContent = seatCount;
+    document.getElementById('seat-count-row').style.display = 'block';
+  } else {
+    document.getElementById('seat-count-row').style.display = 'none';
+  }
 
   if (est) {
     document.getElementById('est-card').style.display = 'block';
-    document.getElementById('est-mini').innerHTML = miniGrid((est.vip||0)+(est.lay||0), est.monk, est.volunteer||0, est.driver, 0, 0);
+    document.getElementById('est-mini').innerHTML = miniGrid((est.vip||0)+(est.lay||0), est.monk, est.volunteer||0, 0, 0, 0, 0, true);
   }
 
   if (prev) {
@@ -397,10 +405,11 @@ function setBtn(id, disabled, text) {
   b.disabled = disabled; b.textContent = text;
 }
 
-function miniGrid(lay, monk, volunteer, driver, bigCar, returnCount, lateArrival) {
+function miniGrid(lay, monk, volunteer, driver, bigCar, returnCount, lateArrival, hideStats) {
   const grid = ['信眾','法師','義工'].map((l, i) =>
     `<div class="mini-item"><div class="n">${[lay,monk,volunteer][i]}</div><div class="l">${l}</div></div>`
   ).join('');
+  if (hideStats) return `<div class="mini-grid">${grid}</div>`;
   const lateRow = lateArrival
     ? `<div class="driver-row" style="display:flex;padding:4px 0;gap:8px;border-top:1px dashed #eee;margin-top:4px;">
         <span style="font-size:12px;color:var(--muted);">晚到人數 <strong style="font-size:16px;font-weight:700;color:var(--navy);">${lateArrival}</strong></span>
