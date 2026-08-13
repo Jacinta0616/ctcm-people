@@ -369,6 +369,8 @@ function renderComparison() {
   const diff = c.repSummary.total - c.estSummary.total;
   const diffStr = diff > 0 ? '+' + diff : String(diff);
   const diffColor = diff >= 0 ? '#1565c0' : 'var(--danger)';
+  const repRows = c.compRows.filter(r => r.reported);
+  const totLateArr = repRows.reduce((s,r) => s+(r.lateArrival||0), 0);
 
   document.getElementById('comp-stats').innerHTML = [
     { lbl:'參與精舍', num: c.compRows.length },
@@ -401,11 +403,14 @@ function renderComparison() {
     <div class="hall-card" style="border-left:4px solid ${diffColor};display:flex;justify-content:space-between;align-items:center;">
       <div style="font-size:14px;font-weight:600;color:${diffColor};">差異總計（實到－報名）</div>
       <div style="font-size:28px;font-weight:800;color:${diffColor};">${c.estSummary.total > 0 ? diffStr : '—'}</div>
+    </div>
+    <div class="hall-card" style="border-left:4px solid #e65100;display:flex;justify-content:space-between;align-items:center;margin-top:12px;">
+      <div style="font-size:14px;font-weight:600;color:#e65100;">晚到人數合計</div>
+      <div style="font-size:28px;font-weight:800;color:#e65100;">${totLateArr}</div>
     </div>`;
 
   // 詳細對照表（合入比較總覽）
   const rows     = c.compRows;
-  const repRows  = rows.filter(r => r.reported);
   const totELay  = rows.reduce((s,r) => s+r.estLay,  0);
   const totEMonk = rows.reduce((s,r) => s+r.estMonk, 0);
   const totEVol  = rows.reduce((s,r) => s+r.estVol,  0);
