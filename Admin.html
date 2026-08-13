@@ -376,11 +376,11 @@ async function fetchDashboard(actId) {
     const estLay  = (est.vip||0)+(est.lay||0);
     const estMonk = est.monk||0;
     const estVol  = est.volunteer||0;
-    const estTotal = estLay + estMonk + estVol + (est.driver||0);
+    const estTotal = estLay + estMonk + estVol;
     const repLay  = rep ? (rep.vip||0)+rep.lay : null;
     const repMonk = rep ? rep.monk : null;
     const repVol  = rep ? (rep.volunteer||0) : null;
-    const repTotal = rep ? repLay + repMonk + repVol + rep.driver : null;
+    const repTotal = rep ? repLay + repMonk + repVol : null;
     const estPeople = estLay + estMonk + estVol;
     const repPeople = rep ? repLay + repMonk + repVol : null;
     const diffPeople = repPeople !== null ? repPeople - estPeople : null;
