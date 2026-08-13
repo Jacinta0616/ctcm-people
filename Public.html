@@ -262,7 +262,7 @@ async function fetchDashboard(actId) {
 
   // 報名 / 實到 類別加總（不含便當）
   const estSummary = { lay: 0, monk: 0, volunteer: 0, total: 0 };
-  const repSummary = { lay: 0, monk: 0, volunteer: 0, total: 0 };
+  const repSummary = { lay: 0, monk: 0, volunteer: 0, total: 0, lateArrival: 0 };
   participatingTemples.forEach(t => {
     const est = estMap[t.number];
     if (est) {
@@ -279,6 +279,7 @@ async function fetchDashboard(actId) {
       repSummary.monk += rep.monk || 0;
       repSummary.volunteer += rep.volunteer || 0;
       repSummary.total += lay + (rep.monk||0) + (rep.volunteer||0);
+      repSummary.lateArrival += rep.late_arrival || 0;
     }
   });
 
@@ -379,11 +380,12 @@ function renderComparison() {
     { lbl:'報到率',   num: 報到率 },
   ].map(s => `<div class="stat-card${s.warn?' warn':''}"><div class="num">${s.num}</div><div class="lbl">${s.lbl}</div></div>`).join('');
 
-  function summaryCard(title, data, accentColor) {
-    const items = [['信眾', data.lay], ['法師', data.monk], ['義工', data.volunteer], ['合計', data.total]];
+  function summaryCard(title, data, accentColor, extraItems = []) {
+    const items = [['信眾', data.lay], ['法師', data.monk], ['義工', data.volunteer], ...extraItems, ['合計', data.total]];
+    const cols = items.length > 4 ? 'repeat(3, 1fr)' : '1fr 1fr';
     return `<div class="hall-card" style="border-left:4px solid ${accentColor};">
       <div class="hall-title" style="font-size:15px;color:${accentColor};margin-bottom:12px;">${title}</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+      <div style="display:grid;grid-template-columns:${cols};gap:12px;">
         ${items.map(([l, n]) => `
           <div style="text-align:center;">
             <div style="font-size:28px;font-weight:800;color:var(--navy);">${n}</div>
@@ -398,15 +400,11 @@ function renderComparison() {
   document.getElementById('comp-summary').innerHTML =
     `<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
       ${summaryCard('📋 已報名', c.estSummary, '#2d4a6e')}
-      ${summaryCard('✅ 實到', c.repSummary, '#2e7d32')}
+      ${summaryCard('✅ 實到', c.repSummary, '#2e7d32', [['晚到', c.repSummary.lateArrival]])}
     </div>
     <div class="hall-card" style="border-left:4px solid ${diffColor};display:flex;justify-content:space-between;align-items:center;">
       <div style="font-size:14px;font-weight:600;color:${diffColor};">差異總計（實到－報名）</div>
       <div style="font-size:28px;font-weight:800;color:${diffColor};">${c.estSummary.total > 0 ? diffStr : '—'}</div>
-    </div>
-    <div class="hall-card" style="border-left:4px solid #e65100;display:flex;justify-content:space-between;align-items:center;margin-top:12px;">
-      <div style="font-size:14px;font-weight:600;color:#e65100;">晚到人數合計</div>
-      <div style="font-size:28px;font-weight:800;color:#e65100;">${totLateArr}</div>
     </div>`;
 
   // 詳細對照表（合入比較總覽）
