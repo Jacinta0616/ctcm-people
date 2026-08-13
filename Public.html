@@ -421,7 +421,6 @@ function renderComparison() {
   const totEPpl    = totELay + totEMonk + totEVol;
   const totRPpl    = totRLay + totRMonk + totRVol;
   const totRate    = totEPpl > 0 ? Math.round(totRPpl / totEPpl * 100) + '%' : '—';
-  const totLateArr = repRows.reduce((s,r) => s+(r.lateArrival||0), 0);
   let sorted = [...rows].sort((a,b) => a.number.localeCompare(b.number));
   if (compSearch.trim()) {
     const q = compSearch.trim().toLowerCase();
