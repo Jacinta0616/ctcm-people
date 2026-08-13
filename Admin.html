@@ -174,6 +174,7 @@ tr.total-row td { background:#f0ede8; font-weight:700; border-top:2px solid var(
               <th rowspan="2" style="vertical-align:middle;">精舍</th>
               <th colspan="3" style="text-align:center;background:#2a4a7a;">── 報名人數 ──</th>
               <th colspan="3" style="text-align:center;background:#1a6030;">── 實到人數 ──</th>
+              <th rowspan="2" style="vertical-align:middle;text-align:center;">晚到人數</th>
               <th rowspan="2" style="vertical-align:middle;text-align:center;">落差</th>
               <th rowspan="2" style="vertical-align:middle;text-align:center;">報到率</th>
               <th rowspan="2" style="vertical-align:middle;text-align:center;">狀態</th>
@@ -183,7 +184,7 @@ tr.total-row td { background:#f0ede8; font-weight:700; border-top:2px solid var(
               <th>參加法會</th><th>法師</th><th>義工</th>
             </tr>
           </thead>
-          <tbody id="comp-body"><tr><td colspan="10" class="empty-msg">請先選擇活動</td></tr></tbody>
+          <tbody id="comp-body"><tr><td colspan="11" class="empty-msg">請先選擇活動</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -391,6 +392,7 @@ async function fetchDashboard(actId) {
       estLay, estMonk, estVol, estPeople,
       repLay, repMonk, repVol, repPeople, diffPeople,
       estTotal, repTotal, 落差, 報到率,
+      lateArrival: rep ? (rep.late_arrival || 0) : null,
       reported: !!rep,
       reportedAt: rep ? new Date(rep.reported_at).toLocaleString('zh-TW',{timeZone:'Asia/Taipei'}) : null
     };
@@ -603,10 +605,11 @@ function renderComparison() {
   const totRLay  = repRows.reduce((s,r) => s+r.repLay,  0);
   const totRMonk = repRows.reduce((s,r) => s+r.repMonk, 0);
   const totRVol  = repRows.reduce((s,r) => s+r.repVol,  0);
-  const totDiff  = (totRLay+totRMonk+totRVol) - (totELay+totEMonk+totEVol);
-  const totEPpl  = totELay + totEMonk + totEVol;
-  const totRPpl  = totRLay + totRMonk + totRVol;
-  const totRate  = totEPpl > 0 ? Math.round(totRPpl / totEPpl * 100) + '%' : '—';
+  const totDiff      = (totRLay+totRMonk+totRVol) - (totELay+totEMonk+totEVol);
+  const totEPpl      = totELay + totEMonk + totEVol;
+  const totRPpl      = totRLay + totRMonk + totRVol;
+  const totRate      = totEPpl > 0 ? Math.round(totRPpl / totEPpl * 100) + '%' : '—';
+  const totLateArr   = repRows.reduce((s,r) => s+(r.lateArrival||0), 0);
 
   document.getElementById('comp-body').innerHTML =
     display.map(r => {
@@ -622,6 +625,7 @@ function renderComparison() {
         <td style="text-align:center;">${r.reported ? r.repLay  : '—'}</td>
         <td style="text-align:center;">${r.reported ? r.repMonk : '—'}</td>
         <td style="text-align:center;">${r.reported ? r.repVol  : '—'}</td>
+        <td style="text-align:center;">${r.lateArrival !== null ? r.lateArrival : '—'}</td>
         <td style="text-align:center;">${diffFmt(r.diffPeople)}</td>
         <td style="text-align:center;">${r.報到率||'—'}</td>
         <td>${badge}</td>
@@ -635,11 +639,12 @@ function renderComparison() {
       <td style="text-align:center;">${totRLay}</td>
       <td style="text-align:center;">${totRMonk}</td>
       <td style="text-align:center;">${totRVol}</td>
+      <td style="text-align:center;">${totLateArr}</td>
       <td style="text-align:center;">${diffFmt(totDiff)}</td>
       <td style="text-align:center;">${totRate}</td>
       <td></td>
     </tr>`
-    || '<tr><td colspan="10" class="empty-msg">無資料</td></tr>';
+    || '<tr><td colspan="11" class="empty-msg">無資料</td></tr>';
 }
 
 /* ── 殿堂視角 ── */
