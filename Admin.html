@@ -206,9 +206,9 @@ tr.total-row td { background:#f0ede8; font-weight:700; border-top:2px solid var(
       </div>
       <div class="table-wrap">
         <table><thead><tr>
-          <th>精舍</th><th>信眾</th><th>法師</th><th>義工</th><th>合計</th><th>便當數</th><th>大車數</th><th>回點數</th><th>晚到人數</th><th>晚到便當</th><th>回報時間</th><th></th>
+          <th>精舍</th><th>信眾</th><th>法師</th><th>義工</th><th>合計</th><th>便當數</th><th>晚到人數</th><th>晚到便當</th><th>回報時間</th><th></th>
         </tr></thead>
-        <tbody id="temple-body"><tr><td colspan="12" class="empty-msg">請先選擇活動</td></tr></tbody>
+        <tbody id="temple-body"><tr><td colspan="10" class="empty-msg">請先選擇活動</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -678,14 +678,14 @@ function renderTemple() {
       ? rows.map(r =>
           `<tr>
             <td>${r.name}</td><td>${r.信眾}</td><td>${r.monk}</td><td>${r.volunteer}</td>
-            <td><strong>${r.total}</strong></td><td>${r.driver}</td><td>${r.bigCar}</td><td>${r.returnCount}</td>
+            <td><strong>${r.total}</strong></td><td>${r.driver}</td>
             <td>${r.lateArrival || 0}</td><td>${r.lateBento || 0}</td>
             <td style="font-size:12px;color:var(--muted);">${r.reportedAt}</td>
             <td><button class="btn btn-sm btn-outline" style="padding:3px 10px;font-size:12px;"
                 onclick="openAdminReport('${r.number}')">修改</button></td>
           </tr>`).join('')
-      : '<tr><td colspan="12" class="empty-msg">尚無回報資料</td></tr>') +
-    `<tr class="total-row"><td>合計</td><td>${t.信眾}</td><td>${t.monk}</td><td>${t.volunteer}</td><td>${t.total}</td><td>${t.driver}</td><td>${t.bigCar}</td><td>${t.returnCount}</td><td>${t.lateArrival}</td><td>${t.lateBento}</td><td></td><td></td></tr>`;
+      : '<tr><td colspan="10" class="empty-msg">尚無回報資料</td></tr>') +
+    `<tr class="total-row"><td>合計</td><td>${t.信眾}</td><td>${t.monk}</td><td>${t.volunteer}</td><td>${t.total}</td><td>${t.driver}</td><td>${t.lateArrival}</td><td>${t.lateBento}</td><td></td><td></td></tr>`;
 }
 
 /* ── 齋供視角 ── */
