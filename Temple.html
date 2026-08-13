@@ -177,8 +177,9 @@ header p  { font-size:13px; opacity:.75; margin-top:2px; }
           <span style="font-size:24px;font-weight:800;color:var(--muted);" id="bigcar-display">0</span>
         </div>
         <div class="total-row" style="flex:1;margin:0;padding:0;border-left:1px dashed #ddd;">
-          <span style="font-size:14px;color:var(--muted);">回點數<br><span style="font-size:10px;">(自動)</span></span>
-          <span style="font-size:24px;font-weight:800;color:var(--navy);" id="return-count-display">0</span>
+          <span style="font-size:14px;color:var(--muted);">回點數<br><span style="font-size:10px;">(可修改)</span></span>
+          <input type="number" id="return-count-display" min="0" value="0"
+            style="font-size:24px;font-weight:800;color:var(--navy);width:100%;border:none;border-bottom:1px dashed var(--navy);background:transparent;text-align:center;padding:0;">
         </div>
       </div>
       <div id="late-display-row" style="display:flex;gap:0;margin-top:6px;padding-top:8px;border-top:1px dashed #ddd;display:none;">
@@ -347,6 +348,7 @@ function renderMain(rest, est, prev) {
     document.getElementById('f-late-arrival').value = prev.late_arrival || 0;
     document.getElementById('f-note').value         = prev.note || '';
     calcTotal();
+    document.getElementById('return-count-display').value = prev.return_count || 0;
   }
   show('screen-main');
 }
@@ -357,10 +359,10 @@ function calcTotal() {
   const vol     = parseInt(document.getElementById('f-volunteer').value)    || 0;
   const bigCar  = parseInt(document.getElementById('f-bigcar').value)       || 0;
   const lateArr = parseInt(document.getElementById('f-late-arrival').value) || 0;
-  document.getElementById('total-num').textContent            = lay + monk + vol;
-  document.getElementById('driver-display').textContent       = parseInt(document.getElementById('f-driver').value) || 0;
-  document.getElementById('bigcar-display').textContent       = bigCar;
-  document.getElementById('return-count-display').textContent = lay + monk + bigCar + lateArr;
+  document.getElementById('total-num').textContent      = lay + monk + vol;
+  document.getElementById('driver-display').textContent = parseInt(document.getElementById('f-driver').value) || 0;
+  document.getElementById('bigcar-display').textContent = bigCar;
+  document.getElementById('return-count-display').value = lay + monk + bigCar + lateArr;
   document.getElementById('late-arrival-display').textContent = lateArr;
 }
 
@@ -372,7 +374,7 @@ async function doSubmit() {
   const driver      = parseInt(document.getElementById('f-driver').value)       || 0;
   const bigCar      = parseInt(document.getElementById('f-bigcar').value)       || 0;
   const lateArrival = parseInt(document.getElementById('f-late-arrival').value) || 0;
-  const returnCount = lay + monk + bigCar + lateArrival;
+  const returnCount = parseInt(document.getElementById('return-count-display').value) || 0;
   const note        = document.getElementById('f-note').value;
 
   if ((lay + monk + volunteer + driver + bigCar + lateArrival) === 0 && !confirm('總人數為 0，確定要送出嗎？')) return;

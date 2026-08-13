@@ -243,6 +243,9 @@ tr.total-row td { background:#f0ede8; font-weight:700; border-top:2px solid var(
         <button class="btn btn-outline btn-sm" onclick="document.getElementById('file-temple').click()">⬆ 上傳名單</button>
         <input type="file" id="file-temple" accept=".csv,.xlsx,.xls" style="display:none" onchange="handleUploadTemple(this)">
         <span class="upload-hint">格式：精舍編號, 精舍名稱, 帳號, 密碼（支援 Excel / CSV）</span>
+        <input id="temple-search" type="text" placeholder="🔍 搜尋精舍名稱或代碼…"
+          style="margin-left:auto;padding:5px 10px;border:1px solid #ccc;border-radius:6px;font-size:13px;width:220px;"
+          oninput="templeSearch=this.value;filterTempleList()">
       </div>
       <div class="table-wrap">
         <table><thead><tr><th>#</th><th>精舍編號</th><th>精舍名稱</th><th>帳號</th><th>密碼</th></tr></thead>
@@ -265,6 +268,9 @@ tr.total-row td { background:#f0ede8; font-weight:700; border-top:2px solid var(
         <button class="btn btn-success" id="btn-save-setup" onclick="doSaveSetup()">儲存全部</button>
         <span class="save-notice" id="save-notice">✓ 已儲存</span>
         <span style="font-size:13px;color:var(--muted);">修改後記得按「儲存全部」</span>
+        <input id="setup-search" type="text" placeholder="🔍 搜尋精舍名稱或代碼…"
+          style="margin-left:auto;padding:5px 10px;border:1px solid #ccc;border-radius:6px;font-size:13px;width:220px;"
+          oninput="setupSearch=this.value;filterSetupRows()">
       </div>
       <div class="table-wrap">
         <table><thead><tr>
@@ -290,6 +296,8 @@ let currentTab  = 'comparison';
 let dashCache   = null;
 let compFilter  = 'all'; // 'all' | 'reported' | 'unreported'
 let compSearch  = '';
+let setupSearch = '';
+let templeSearch = '';
 
 function show(id) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
@@ -989,7 +997,7 @@ function showMsg(msg, isErr) {
 /* ── 精舍設定 ── */
 function renderSetup() {
   document.getElementById('setup-body').innerHTML = dashCache.setupRows.map((r, i) =>
-    `<tr data-num="${r.number}">
+    `<tr data-num="${r.number}" data-name="${r.name.toLowerCase()}">
       <td style="color:var(--muted);font-size:12px;">${i+1}</td>
       <td><strong>${r.name}</strong></td>
       <td><input type="number" class="setup-num" data-f="lay"       min="0" value="${r.lay}"></td>
@@ -999,6 +1007,15 @@ function renderSetup() {
       <td><input type="text" class="setup-text" data-f="rest" value="${esc(r.rest)}"></td>
     </tr>`
   ).join('') || '<tr><td colspan="7" class="empty-msg">精舍名單為空</td></tr>';
+  filterSetupRows();
+}
+function filterSetupRows() {
+  const q = setupSearch.trim().toLowerCase();
+  document.querySelectorAll('#setup-body tr[data-num]').forEach(tr => {
+    const name = tr.getAttribute('data-name') || '';
+    const num  = tr.getAttribute('data-num').toLowerCase();
+    tr.style.display = (!q || name.includes(q) || num.includes(q)) ? '' : 'none';
+  });
 }
 
 async function doSaveSetup() {
@@ -1161,9 +1178,18 @@ function triggerXlDownload(buffer, filename) {
 }
 
 /* ── 精舍名單管理 ── */
+let _templeListData = [];
 async function loadTempleList() {
   const { data } = await sb.from('temples').select('*').order('number');
-  document.getElementById('temples-body').innerHTML = (data||[]).map((t, i) =>
+  _templeListData = data || [];
+  filterTempleList();
+}
+function filterTempleList() {
+  const q = templeSearch.trim().toLowerCase();
+  const rows = q
+    ? _templeListData.filter(t => t.name.toLowerCase().includes(q) || t.number.toLowerCase().includes(q))
+    : _templeListData;
+  document.getElementById('temples-body').innerHTML = rows.map((t, i) =>
     `<tr><td style="color:var(--muted);font-size:12px;">${i+1}</td>
      <td>${t.number}</td><td><strong>${t.name}</strong></td>
      <td>${t.account}</td>
