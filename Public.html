@@ -132,6 +132,7 @@ tr.total-row td { background:#f0ede8; font-weight:700; border-top:2px solid var(
               <th rowspan="2" style="vertical-align:middle;">精舍</th>
               <th colspan="3" style="text-align:center;background:#2a4a7a;">── 報名人數 ──</th>
               <th colspan="3" style="text-align:center;background:#1a6030;">── 實到人數 ──</th>
+              <th rowspan="2" style="vertical-align:middle;text-align:center;">晚到人數</th>
               <th rowspan="2" style="vertical-align:middle;text-align:center;">落差</th>
               <th rowspan="2" style="vertical-align:middle;text-align:center;">報到率</th>
             </tr>
@@ -140,7 +141,7 @@ tr.total-row td { background:#f0ede8; font-weight:700; border-top:2px solid var(
               <th>參加法會</th><th>法師</th><th>義工</th>
             </tr>
           </thead>
-          <tbody id="comp-detail-body"><tr><td colspan="9" class="empty-msg">請先選擇活動</td></tr></tbody>
+          <tbody id="comp-detail-body"><tr><td colspan="10" class="empty-msg">請先選擇活動</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -255,7 +256,8 @@ async function fetchDashboard(actId) {
     const estPeople = estLay + estMonk + estVol;
     const repPeople = rep ? repLay + repMonk + repVol : null;
     const diffPeople = repPeople !== null ? repPeople - estPeople : null;
-    return { number: t.number, name: t.name, reported: !!rep, estLay, estMonk, estVol, estPeople, repLay, repMonk, repVol, repPeople, diffPeople };
+    return { number: t.number, name: t.name, reported: !!rep, estLay, estMonk, estVol, estPeople, repLay, repMonk, repVol, repPeople, diffPeople,
+             lateArrival: rep ? (rep.late_arrival || 0) : null };
   });
 
   // 報名 / 實到 類別加總（不含便當）
@@ -410,10 +412,11 @@ function renderComparison() {
   const totRLay  = repRows.reduce((s,r) => s+r.repLay,  0);
   const totRMonk = repRows.reduce((s,r) => s+r.repMonk, 0);
   const totRVol  = repRows.reduce((s,r) => s+r.repVol,  0);
-  const totDiff  = (totRLay+totRMonk+totRVol) - (totELay+totEMonk+totEVol);
-  const totEPpl  = totELay + totEMonk + totEVol;
-  const totRPpl  = totRLay + totRMonk + totRVol;
-  const totRate  = totEPpl > 0 ? Math.round(totRPpl / totEPpl * 100) + '%' : '—';
+  const totDiff    = (totRLay+totRMonk+totRVol) - (totELay+totEMonk+totEVol);
+  const totEPpl    = totELay + totEMonk + totEVol;
+  const totRPpl    = totRLay + totRMonk + totRVol;
+  const totRate    = totEPpl > 0 ? Math.round(totRPpl / totEPpl * 100) + '%' : '—';
+  const totLateArr = repRows.reduce((s,r) => s+(r.lateArrival||0), 0);
   let sorted = [...rows].sort((a,b) => a.number.localeCompare(b.number));
   if (compSearch.trim()) {
     const q = compSearch.trim().toLowerCase();
@@ -429,6 +432,7 @@ function renderComparison() {
       <td style="text-align:center;">${r.reported ? r.repLay  : '—'}</td>
       <td style="text-align:center;">${r.reported ? r.repMonk : '—'}</td>
       <td style="text-align:center;">${r.reported ? r.repVol  : '—'}</td>
+      <td style="text-align:center;">${r.lateArrival !== null ? r.lateArrival : '—'}</td>
       <td style="text-align:center;">${diffFmt(r.diffPeople)}</td>
       <td style="text-align:center;">${r.報到率||'—'}</td>
     </tr>`).join('') +
@@ -436,6 +440,7 @@ function renderComparison() {
       <td>合計（已回報 ${repRows.length}／${rows.length} 間）</td>
       <td style="text-align:center;">${totELay}</td><td style="text-align:center;">${totEMonk}</td><td style="text-align:center;">${totEVol}</td>
       <td style="text-align:center;">${totRLay}</td><td style="text-align:center;">${totRMonk}</td><td style="text-align:center;">${totRVol}</td>
+      <td style="text-align:center;">${totLateArr}</td>
       <td style="text-align:center;">${diffFmt(totDiff)}</td>
       <td style="text-align:center;">${totRate}</td>
     </tr>`;
