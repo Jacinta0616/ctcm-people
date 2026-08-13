@@ -132,7 +132,7 @@ tr.total-row td { background:#f0ede8; font-weight:700; border-top:2px solid var(
               <th rowspan="2" style="vertical-align:middle;">精舍</th>
               <th colspan="3" style="text-align:center;background:#2a4a7a;">── 報名人數 ──</th>
               <th colspan="3" style="text-align:center;background:#1a6030;">── 實到人數 ──</th>
-              <th rowspan="2" style="vertical-align:middle;text-align:center;">晚到人數</th>
+              <th id="comp-detail-th-late" rowspan="2" style="vertical-align:middle;text-align:center;display:none;">晚到人數</th>
               <th rowspan="2" style="vertical-align:middle;text-align:center;">落差</th>
               <th rowspan="2" style="vertical-align:middle;text-align:center;">報到率</th>
             </tr>
@@ -222,12 +222,14 @@ async function fetchDashboard(actId) {
   dashCache = null;
   document.getElementById('last-update').textContent = '載入中…';
 
-  const [templesRes, estRes, restRes, repRes] = await Promise.all([
+  const [templesRes, estRes, restRes, repRes, eventRes] = await Promise.all([
     sb.from('temples').select('*').order('number'),
     sb.from('estimates').select('*').eq('event_id', actId),
     sb.from('rest_areas').select('*').eq('event_id', actId),
-    sb.from('reports').select('*').eq('event_id', actId)
+    sb.from('reports').select('*').eq('event_id', actId),
+    sb.from('events').select('enable_late_arrival').eq('id', actId).maybeSingle()
   ]);
+  const enableLateArrival = !!(eventRes.data?.enable_late_arrival);
 
   const temples = templesRes.data || [];
   const estMap  = Object.fromEntries((estRes.data || []).map(r => [r.temple_number, r]));
@@ -335,7 +337,7 @@ async function fetchDashboard(actId) {
   });
 
   dashCache = { compRows, estSummary, repSummary, mainCount, totalSeatCount, hallMap, templeRows, 總計, mealMap, mealTotal,
-                未回報數: compRows.filter(r => !r.reported).length };
+                未回報數: compRows.filter(r => !r.reported).length, enableLateArrival };
   document.getElementById('last-update').textContent =
     '更新：' + new Date().toLocaleTimeString('zh-TW',{timeZone:'Asia/Taipei'});
   renderCurrentTab();
@@ -363,6 +365,8 @@ function renderCurrentTab() {
 
 function renderComparison() {
   const c = dashCache;
+  const late = c.enableLateArrival;
+  document.getElementById('comp-detail-th-late').style.display = late ? '' : 'none';
   const reported = c.compRows.filter(r => r.reported).length;
   const 報到率 = c.estSummary.total > 0
     ? ((c.repSummary.total / c.estSummary.total) * 100).toFixed(1) + '%'
@@ -400,7 +404,7 @@ function renderComparison() {
   document.getElementById('comp-summary').innerHTML =
     `<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
       ${summaryCard('📋 已報名', c.estSummary, '#2d4a6e')}
-      ${summaryCard('✅ 實到', c.repSummary, '#2e7d32', [['晚到', c.repSummary.lateArrival]])}
+      ${summaryCard('✅ 實到', c.repSummary, '#2e7d32', late ? [['晚到', c.repSummary.lateArrival]] : [])}
     </div>
     <div class="hall-card" style="border-left:4px solid ${diffColor};display:flex;justify-content:space-between;align-items:center;">
       <div style="font-size:14px;font-weight:600;color:${diffColor};">差異總計（實到－報名）</div>
@@ -425,6 +429,7 @@ function renderComparison() {
     sorted = sorted.filter(r => r.name.toLowerCase().includes(q) || r.number.toLowerCase().includes(q));
   }
 
+  const lateCell = (val) => late ? `<td style="text-align:center;">${val}</td>` : '';
   document.getElementById('comp-detail-body').innerHTML =
     sorted.map(r => `<tr${!r.reported?' class="unreported"':''}>
       <td><span style="color:var(--muted);font-size:12px;margin-right:4px;">${r.number}</span>${r.name}${!r.reported ? ' <span class="badge badge-wait" style="font-size:10px;">未回報</span>' : ''}</td>
@@ -434,7 +439,7 @@ function renderComparison() {
       <td style="text-align:center;">${r.reported ? r.repLay  : '—'}</td>
       <td style="text-align:center;">${r.reported ? r.repMonk : '—'}</td>
       <td style="text-align:center;">${r.reported ? r.repVol  : '—'}</td>
-      <td style="text-align:center;">${r.lateArrival !== null ? r.lateArrival : '—'}</td>
+      ${lateCell(r.lateArrival !== null ? r.lateArrival : '—')}
       <td style="text-align:center;">${diffFmt(r.diffPeople)}</td>
       <td style="text-align:center;">${r.報到率||'—'}</td>
     </tr>`).join('') +
@@ -442,7 +447,7 @@ function renderComparison() {
       <td>合計（已回報 ${repRows.length}／${rows.length} 間）</td>
       <td style="text-align:center;">${totELay}</td><td style="text-align:center;">${totEMonk}</td><td style="text-align:center;">${totEVol}</td>
       <td style="text-align:center;">${totRLay}</td><td style="text-align:center;">${totRMonk}</td><td style="text-align:center;">${totRVol}</td>
-      <td style="text-align:center;">${totLateArr}</td>
+      ${lateCell(totLateArr)}
       <td style="text-align:center;">${diffFmt(totDiff)}</td>
       <td style="text-align:center;">${totRate}</td>
     </tr>`;

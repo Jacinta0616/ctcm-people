@@ -174,7 +174,7 @@ tr.total-row td { background:#f0ede8; font-weight:700; border-top:2px solid var(
               <th rowspan="2" style="vertical-align:middle;">精舍</th>
               <th colspan="3" style="text-align:center;background:#2a4a7a;">── 報名人數 ──</th>
               <th colspan="3" style="text-align:center;background:#1a6030;">── 實到人數 ──</th>
-              <th rowspan="2" style="vertical-align:middle;text-align:center;">晚到人數</th>
+              <th id="comp-th-late" rowspan="2" style="vertical-align:middle;text-align:center;display:none;">晚到人數</th>
               <th rowspan="2" style="vertical-align:middle;text-align:center;">落差</th>
               <th rowspan="2" style="vertical-align:middle;text-align:center;">報到率</th>
               <th rowspan="2" style="vertical-align:middle;text-align:center;">狀態</th>
@@ -184,7 +184,7 @@ tr.total-row td { background:#f0ede8; font-weight:700; border-top:2px solid var(
               <th>參加法會</th><th>法師</th><th>義工</th>
             </tr>
           </thead>
-          <tbody id="comp-body"><tr><td colspan="11" class="empty-msg">請先選擇活動</td></tr></tbody>
+          <tbody id="comp-body"><tr><td colspan="10" class="empty-msg">請先選擇活動</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -207,9 +207,9 @@ tr.total-row td { background:#f0ede8; font-weight:700; border-top:2px solid var(
       </div>
       <div class="table-wrap">
         <table><thead><tr>
-          <th>精舍</th><th>信眾</th><th>法師</th><th>義工</th><th>合計</th><th>便當數</th><th>晚到人數</th><th>回報時間</th><th></th>
+          <th>精舍</th><th>信眾</th><th>法師</th><th>義工</th><th>合計</th><th>便當數</th><th id="temple-th-late" style="display:none;">晚到人數</th><th>回報時間</th><th></th>
         </tr></thead>
-        <tbody id="temple-body"><tr><td colspan="9" class="empty-msg">請先選擇活動</td></tr></tbody>
+        <tbody id="temple-body"><tr><td colspan="8" class="empty-msg">請先選擇活動</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -344,14 +344,16 @@ async function fetchDashboard(actId) {
   dashCache = null;
   document.getElementById('last-update').textContent = '載入中…';
 
-  const [templesRes, estRes, restRes, repRes, pickupRes] = await Promise.all([
+  const [templesRes, estRes, restRes, repRes, pickupRes, eventRes] = await Promise.all([
     sb.from('temples').select('*').order('number'),
     sb.from('estimates').select('*').eq('event_id', actId),
     sb.from('rest_areas').select('*').eq('event_id', actId),
     sb.from('reports').select('*').eq('event_id', actId),
-    sb.from('pickups').select('temple_number, picked_up_at').eq('event_id', actId)
+    sb.from('pickups').select('temple_number, picked_up_at').eq('event_id', actId),
+    sb.from('events').select('enable_late_arrival').eq('id', actId).maybeSingle()
   ]);
 
+  const enableLateArrival = !!(eventRes.data?.enable_late_arrival);
   const temples   = templesRes.data || [];
   const estMap    = Object.fromEntries((estRes.data || []).map(r => [r.temple_number, r]));
   const restMap   = Object.fromEntries((restRes.data || []).map(r => [r.temple_number, r.description]));
@@ -475,6 +477,7 @@ async function fetchDashboard(actId) {
 
   const actName = document.getElementById('activity-select').selectedOptions[0]?.textContent || actId;
   dashCache = { actId, actName, compRows, mainCount, totalSeatCount, hallMap, mealMap, mealTotal, mealReturnTotal, pickupMap, templeRows, 總計, setupRows,
+                enableLateArrival,
                 未回報數: compRows.filter(r => !r.reported).length };
   document.getElementById('last-update').textContent =
     '更新：' + new Date().toLocaleTimeString('zh-TW',{timeZone:'Asia/Taipei'});
@@ -553,6 +556,8 @@ function setCompFilter(f) {
 }
 
 function renderComparison() {
+  const late = dashCache.enableLateArrival;
+  document.getElementById('comp-th-late').style.display = late ? '' : 'none';
   const rows = dashCache.compRows;
   const reported = rows.filter(r => r.reported).length;
   const repSum   = rows.reduce((a,r) => a+(r.repTotal||0), 0);
@@ -610,6 +615,8 @@ function renderComparison() {
   const totRPpl      = totRLay + totRMonk + totRVol;
   const totRate      = totEPpl > 0 ? Math.round(totRPpl / totEPpl * 100) + '%' : '—';
   const totLateArr   = repRows.reduce((s,r) => s+(r.lateArrival||0), 0);
+  const lateCell     = (val) => late ? `<td style="text-align:center;">${val}</td>` : '';
+  const colspan      = late ? 11 : 10;
 
   document.getElementById('comp-body').innerHTML =
     display.map(r => {
@@ -625,7 +632,7 @@ function renderComparison() {
         <td style="text-align:center;">${r.reported ? r.repLay  : '—'}</td>
         <td style="text-align:center;">${r.reported ? r.repMonk : '—'}</td>
         <td style="text-align:center;">${r.reported ? r.repVol  : '—'}</td>
-        <td style="text-align:center;">${r.lateArrival !== null ? r.lateArrival : '—'}</td>
+        ${lateCell(r.lateArrival !== null ? r.lateArrival : '—')}
         <td style="text-align:center;">${diffFmt(r.diffPeople)}</td>
         <td style="text-align:center;">${r.報到率||'—'}</td>
         <td>${badge}</td>
@@ -639,12 +646,12 @@ function renderComparison() {
       <td style="text-align:center;">${totRLay}</td>
       <td style="text-align:center;">${totRMonk}</td>
       <td style="text-align:center;">${totRVol}</td>
-      <td style="text-align:center;">${totLateArr}</td>
+      ${lateCell(totLateArr)}
       <td style="text-align:center;">${diffFmt(totDiff)}</td>
       <td style="text-align:center;">${totRate}</td>
       <td></td>
     </tr>`
-    || '<tr><td colspan="11" class="empty-msg">無資料</td></tr>';
+    || `<tr><td colspan="${colspan}" class="empty-msg">無資料</td></tr>`;
 }
 
 /* ── 殿堂視角 ── */
@@ -674,21 +681,25 @@ function renderHall() {
 
 /* ── 精舍視角 ── */
 function renderTemple() {
-  const t = dashCache.總計;
+  const t    = dashCache.總計;
   const rows = dashCache.templeRows;
+  const late = dashCache.enableLateArrival;
+  document.getElementById('temple-th-late').style.display = late ? '' : 'none';
+  const lateCell = (val) => late ? `<td>${val}</td>` : '';
+  const colspan  = late ? 9 : 8;
   document.getElementById('temple-body').innerHTML =
     (rows.length
       ? rows.map(r =>
           `<tr>
             <td>${r.name}</td><td>${r.信眾}</td><td>${r.monk}</td><td>${r.volunteer}</td>
             <td><strong>${r.total}</strong></td><td>${r.driver}</td>
-            <td>${r.lateArrival || 0}</td>
+            ${lateCell(r.lateArrival || 0)}
             <td style="font-size:12px;color:var(--muted);">${r.reportedAt}</td>
             <td><button class="btn btn-sm btn-outline" style="padding:3px 10px;font-size:12px;"
                 onclick="openAdminReport('${r.number}')">修改</button></td>
           </tr>`).join('')
-      : '<tr><td colspan="9" class="empty-msg">尚無回報資料</td></tr>') +
-    `<tr class="total-row"><td>合計</td><td>${t.信眾}</td><td>${t.monk}</td><td>${t.volunteer}</td><td>${t.total}</td><td>${t.driver}</td><td>${t.lateArrival}</td><td></td><td></td></tr>`;
+      : `<tr><td colspan="${colspan}" class="empty-msg">尚無回報資料</td></tr>`) +
+    `<tr class="total-row"><td>合計</td><td>${t.信眾}</td><td>${t.monk}</td><td>${t.volunteer}</td><td>${t.total}</td><td>${t.driver}</td>${lateCell(t.lateArrival)}<td></td><td></td></tr>`;
 }
 
 /* ── 齋供視角 ── */
@@ -775,9 +786,12 @@ async function loadActivityList() {
     const toggleBtn = a.status === '進行中'
       ? `<button class="btn btn-sm btn-danger" onclick="setStatus('${a.id}','已結束')">設為已結束</button>`
       : `<button class="btn btn-sm btn-warn" onclick="setStatus('${a.id}','進行中')">設為進行中</button>`;
+    const lateBtn = a.enable_late_arrival
+      ? `<button class="btn btn-sm btn-success" onclick="toggleLateArrival('${a.id}',false)">晚到 ✓</button>`
+      : `<button class="btn btn-sm btn-outline" onclick="toggleLateArrival('${a.id}',true)">晚到 OFF</button>`;
     return `<tr><td style="color:var(--muted);font-size:12px;">${a.id}</td>
       <td>${a.name}</td><td>${a.date}</td><td>${badge}</td>
-      <td style="display:flex;gap:6px;flex-wrap:wrap;">${toggleBtn}
+      <td style="display:flex;gap:6px;flex-wrap:wrap;">${toggleBtn}${lateBtn}
         <button class="btn btn-sm btn-danger" onclick="deleteActivity('${a.id}','${a.name}')">刪除</button>
       </td></tr>`;
   }).join('') || '<tr><td colspan="5" class="empty-msg">尚無活動</td></tr>';
@@ -872,6 +886,7 @@ function openAdminReport(templeNumber) {
     }
   }
 
+  document.getElementById('ar-late-row').style.display = dashCache.enableLateArrival ? 'grid' : 'none';
   document.getElementById('ar-err').textContent = '';
   document.getElementById('ar-modal').style.display = 'flex';
 }
@@ -957,6 +972,12 @@ async function setStatus(actId, status) {
   await sb.from('events').update({ status }).eq('id', actId);
   loadActivityList();
   loadActivities();
+}
+
+async function toggleLateArrival(actId, enable) {
+  await sb.from('events').update({ enable_late_arrival: enable }).eq('id', actId);
+  loadActivityList();
+  if (dashCache?.actId === actId) fetchDashboard(actId);
 }
 
 function showMsg(msg, isErr) {
@@ -1771,7 +1792,7 @@ async function downloadExcel() {
       <div><label style="font-size:12px;color:var(--muted);">回點數（自動）</label>
         <input id="ar-return" type="number" readonly style="width:100%;padding:8px;border:2px solid #ddd;border-radius:8px;font-size:15px;text-align:center;background:#f5f5f5;color:#888;"></div>
     </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:18px;">
+    <div id="ar-late-row" style="display:none;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:18px;">
       <div><label style="font-size:12px;color:var(--muted);">晚到人數</label>
         <input id="ar-late-arrival" type="number" min="0" value="0" style="width:100%;padding:8px;border:2px solid #ddd;border-radius:8px;font-size:15px;text-align:center;" oninput="arCalcReturn()"></div>
     </div>
