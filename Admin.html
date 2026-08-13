@@ -206,9 +206,9 @@ tr.total-row td { background:#f0ede8; font-weight:700; border-top:2px solid var(
       </div>
       <div class="table-wrap">
         <table><thead><tr>
-          <th>精舍</th><th>信眾</th><th>法師</th><th>義工</th><th>合計</th><th>便當數</th><th>晚到人數</th><th>晚到便當</th><th>回報時間</th><th></th>
+          <th>精舍</th><th>信眾</th><th>法師</th><th>義工</th><th>合計</th><th>便當數</th><th>晚到人數</th><th>回報時間</th><th></th>
         </tr></thead>
-        <tbody id="temple-body"><tr><td colspan="10" class="empty-msg">請先選擇活動</td></tr></tbody>
+        <tbody id="temple-body"><tr><td colspan="9" class="empty-msg">請先選擇活動</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -429,13 +429,12 @@ async function fetchDashboard(actId) {
                bigCar: rep.big_car || 0,
                returnCount: rep.return_count || 0,
                lateArrival: rep.late_arrival || 0,
-               lateBento: rep.late_bento || 0,
                total: 信眾+rep.monk+volunteer,
                reportedAt: new Date(rep.reported_at).toLocaleString('zh-TW',{timeZone:'Asia/Taipei'}) };
     }).filter(Boolean);
   const 總計 = templeRows.reduce(
-    (a, r) => ({ 信眾:a.信眾+r.信眾, monk:a.monk+r.monk, volunteer:a.volunteer+r.volunteer, driver:a.driver+r.driver, bigCar:a.bigCar+r.bigCar, returnCount:a.returnCount+r.returnCount, lateArrival:a.lateArrival+r.lateArrival, lateBento:a.lateBento+r.lateBento, total:a.total+r.total }),
-    { 信眾:0, monk:0, volunteer:0, driver:0, bigCar:0, returnCount:0, lateArrival:0, lateBento:0, total:0 }
+    (a, r) => ({ 信眾:a.信眾+r.信眾, monk:a.monk+r.monk, volunteer:a.volunteer+r.volunteer, driver:a.driver+r.driver, bigCar:a.bigCar+r.bigCar, returnCount:a.returnCount+r.returnCount, lateArrival:a.lateArrival+r.lateArrival, total:a.total+r.total }),
+    { 信眾:0, monk:0, volunteer:0, driver:0, bigCar:0, returnCount:0, lateArrival:0, total:0 }
   );
 
   // 齋供視角（依殿堂加總便當數 + 回點數 + 領取狀態）
@@ -448,8 +447,7 @@ async function fetchDashboard(actId) {
     const hall = restMap[t.number] || '（未分配）';
     const seatCount = estMap[t.number]?.seat_count || 0;
     if (!mealMap[hall]) mealMap[hall] = { count: 0, returnCount: 0, seatCount: 0, detail: [] };
-    const hallBento = rep.driver + (rep.late_bento || 0);
-    mealMap[hall].count += hallBento;
+    mealMap[hall].count += rep.driver;
     mealMap[hall].returnCount += rep.return_count || 0;
     mealMap[hall].seatCount += seatCount;
     const pickedUp = !!pickupMap[t.number];
@@ -458,10 +456,10 @@ async function fetchDashboard(actId) {
       : null;
     mealMap[hall].detail.push({
       name: t.name, number: t.number,
-      count: hallBento, returnCount: rep.return_count || 0,
+      count: rep.driver, returnCount: rep.return_count || 0,
       seatCount, pickedUp, pickedUpAt
     });
-    mealTotal += hallBento;
+    mealTotal += rep.driver;
     mealReturnTotal += rep.return_count || 0;
   });
 
@@ -679,13 +677,13 @@ function renderTemple() {
           `<tr>
             <td>${r.name}</td><td>${r.信眾}</td><td>${r.monk}</td><td>${r.volunteer}</td>
             <td><strong>${r.total}</strong></td><td>${r.driver}</td>
-            <td>${r.lateArrival || 0}</td><td>${r.lateBento || 0}</td>
+            <td>${r.lateArrival || 0}</td>
             <td style="font-size:12px;color:var(--muted);">${r.reportedAt}</td>
             <td><button class="btn btn-sm btn-outline" style="padding:3px 10px;font-size:12px;"
                 onclick="openAdminReport('${r.number}')">修改</button></td>
           </tr>`).join('')
-      : '<tr><td colspan="10" class="empty-msg">尚無回報資料</td></tr>') +
-    `<tr class="total-row"><td>合計</td><td>${t.信眾}</td><td>${t.monk}</td><td>${t.volunteer}</td><td>${t.total}</td><td>${t.driver}</td><td>${t.lateArrival}</td><td>${t.lateBento}</td><td></td><td></td></tr>`;
+      : '<tr><td colspan="9" class="empty-msg">尚無回報資料</td></tr>') +
+    `<tr class="total-row"><td>合計</td><td>${t.信眾}</td><td>${t.monk}</td><td>${t.volunteer}</td><td>${t.total}</td><td>${t.driver}</td><td>${t.lateArrival}</td><td></td><td></td></tr>`;
 }
 
 /* ── 齋供視角 ── */
@@ -865,7 +863,6 @@ function openAdminReport(templeNumber) {
       document.getElementById('ar-bigcar').value       = rep.bigCar;
       document.getElementById('ar-return').value       = rep.returnCount;
       document.getElementById('ar-late-arrival').value = rep.lateArrival || 0;
-      document.getElementById('ar-late-bento').value   = rep.lateBento   || 0;
       document.getElementById('ar-name').textContent   = rep.name;
     }
   }
@@ -882,7 +879,6 @@ function prefillFromEst(num) {
   document.getElementById('ar-driver').value       = est.driver || 0;
   document.getElementById('ar-bigcar').value       = 0;
   document.getElementById('ar-late-arrival').value = 0;
-  document.getElementById('ar-late-bento').value   = 0;
   document.getElementById('ar-return').value       = (est.lay||0) + (est.monk||0);
   document.getElementById('ar-name').textContent   = '';
 }
@@ -895,14 +891,13 @@ async function submitAdminReport() {
   const driver      = parseInt(document.getElementById('ar-driver').value)       || 0;
   const bigCar      = parseInt(document.getElementById('ar-bigcar').value)       || 0;
   const lateArrival = parseInt(document.getElementById('ar-late-arrival').value) || 0;
-  const lateBento   = parseInt(document.getElementById('ar-late-bento').value)   || 0;
   const returnCnt   = lay + monk + bigCar + lateArrival;
   if (!num) { document.getElementById('ar-err').textContent = '請選擇精舍'; return; }
 
   const { error } = await sb.from('reports').upsert({
     event_id: dashCache.actId, temple_number: num,
     vip: 0, lay, monk, volunteer, driver, big_car: bigCar,
-    late_arrival: lateArrival, late_bento: lateBento,
+    late_arrival: lateArrival,
     return_count: returnCnt,
     reported_at: new Date().toISOString()
   }, { onConflict: 'event_id,temple_number' });
@@ -1774,8 +1769,6 @@ async function downloadExcel() {
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:18px;">
       <div><label style="font-size:12px;color:var(--muted);">晚到人數</label>
         <input id="ar-late-arrival" type="number" min="0" value="0" style="width:100%;padding:8px;border:2px solid #ddd;border-radius:8px;font-size:15px;text-align:center;" oninput="arCalcReturn()"></div>
-      <div><label style="font-size:12px;color:var(--muted);">晚到便當數</label>
-        <input id="ar-late-bento" type="number" min="0" value="0" style="width:100%;padding:8px;border:2px solid #ddd;border-radius:8px;font-size:15px;text-align:center;"></div>
     </div>
     <div id="ar-err" style="color:var(--danger);font-size:13px;margin-bottom:10px;min-height:18px;"></div>
     <div style="display:flex;gap:10px;">

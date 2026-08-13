@@ -152,14 +152,10 @@ header p  { font-size:13px; opacity:.75; margin-top:2px; }
           <input type="number" id="f-bigcar" min="0" value="0" oninput="calcTotal()">
         </div>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:0 0 10px;">
+      <div style="margin:0 0 10px;">
         <div class="inp-group">
           <label>晚到人數 <span style="font-size:11px;color:#bbb;font-weight:400;">(後來才搭車上山)</span></label>
           <input type="number" id="f-late-arrival" min="0" value="0" oninput="calcTotal()">
-        </div>
-        <div class="inp-group">
-          <label>晚到便當數</label>
-          <input type="number" id="f-late-bento" min="0" value="0" oninput="calcTotal()">
         </div>
       </div>
       <div class="inp-group" style="margin-bottom:10px;">
@@ -188,10 +184,6 @@ header p  { font-size:13px; opacity:.75; margin-top:2px; }
         <div class="total-row" style="flex:1;margin:0;padding:0;">
           <span style="font-size:14px;color:var(--muted);">晚到人數</span>
           <span style="font-size:24px;font-weight:800;color:var(--muted);" id="late-arrival-display">0</span>
-        </div>
-        <div class="total-row" style="flex:1;margin:0;padding:0;border-left:1px dashed #ddd;">
-          <span style="font-size:14px;color:var(--muted);">晚到便當</span>
-          <span style="font-size:24px;font-weight:800;color:var(--muted);" id="late-bento-display">0</span>
         </div>
       </div>
       <button class="btn" id="btn-submit" onclick="doSubmit()" style="margin-top:14px;">送出回報</button>
@@ -340,7 +332,6 @@ function renderMain(rest, est, prev) {
     document.getElementById('f-driver').value       = prev.driver;
     document.getElementById('f-bigcar').value       = prev.big_car || 0;
     document.getElementById('f-late-arrival').value = prev.late_arrival || 0;
-    document.getElementById('f-late-bento').value   = prev.late_bento   || 0;
     document.getElementById('f-note').value         = prev.note || '';
     calcTotal();
   }
@@ -358,7 +349,6 @@ function calcTotal() {
   document.getElementById('bigcar-display').textContent       = bigCar;
   document.getElementById('return-count-display').textContent = lay + monk + bigCar + lateArr;
   document.getElementById('late-arrival-display').textContent = lateArr;
-  document.getElementById('late-bento-display').textContent   = parseInt(document.getElementById('f-late-bento').value) || 0;
 }
 
 async function doSubmit() {
@@ -369,7 +359,6 @@ async function doSubmit() {
   const driver      = parseInt(document.getElementById('f-driver').value)       || 0;
   const bigCar      = parseInt(document.getElementById('f-bigcar').value)       || 0;
   const lateArrival = parseInt(document.getElementById('f-late-arrival').value) || 0;
-  const lateBento   = parseInt(document.getElementById('f-late-bento').value)   || 0;
   const returnCount = lay + monk + bigCar + lateArrival;
   const note        = document.getElementById('f-note').value;
 
@@ -382,7 +371,7 @@ async function doSubmit() {
     temple_number: S.精舍編號,
     reported_at:   new Date().toISOString(),
     vip, lay, monk, volunteer, driver, big_car: bigCar,
-    late_arrival: lateArrival, late_bento: lateBento,
+    late_arrival: lateArrival,
     return_count: returnCount,
     note: note || ''
   }, { onConflict: 'event_id,temple_number' });
@@ -392,7 +381,7 @@ async function doSubmit() {
 
   const now = new Date().toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' });
   document.getElementById('success-time').textContent = '回報時間：' + now;
-  document.getElementById('success-mini').innerHTML = miniGrid(lay, monk, volunteer, driver, bigCar, returnCount, lateArrival, lateBento);
+  document.getElementById('success-mini').innerHTML = miniGrid(lay, monk, volunteer, driver, bigCar, returnCount, lateArrival);
   show('screen-success');
 }
 
@@ -408,14 +397,13 @@ function setBtn(id, disabled, text) {
   b.disabled = disabled; b.textContent = text;
 }
 
-function miniGrid(lay, monk, volunteer, driver, bigCar, returnCount, lateArrival, lateBento) {
+function miniGrid(lay, monk, volunteer, driver, bigCar, returnCount, lateArrival) {
   const grid = ['信眾','法師','義工'].map((l, i) =>
     `<div class="mini-item"><div class="n">${[lay,monk,volunteer][i]}</div><div class="l">${l}</div></div>`
   ).join('');
-  const lateRow = (lateArrival || lateBento)
-    ? `<div class="driver-row" style="display:flex;justify-content:space-between;padding:4px 0;gap:8px;border-top:1px dashed #eee;margin-top:4px;">
-        <span style="font-size:12px;color:var(--muted);">晚到人數 <strong style="font-size:16px;font-weight:700;color:var(--navy);">${lateArrival||0}</strong></span>
-        <span style="font-size:12px;color:var(--muted);">晚到便當 <strong style="font-size:16px;font-weight:700;color:var(--navy);">${lateBento||0}</strong></span>
+  const lateRow = lateArrival
+    ? `<div class="driver-row" style="display:flex;padding:4px 0;gap:8px;border-top:1px dashed #eee;margin-top:4px;">
+        <span style="font-size:12px;color:var(--muted);">晚到人數 <strong style="font-size:16px;font-weight:700;color:var(--navy);">${lateArrival}</strong></span>
       </div>` : '';
   return `<div class="mini-grid">${grid}</div>
     <div class="driver-row" style="display:flex;justify-content:space-between;padding:6px 0;gap:8px;">
