@@ -289,6 +289,9 @@ async function fetchDashboard(actId) {
   const hallMap = {};
   let totalVipGuest = 0;
   let totalHallCount = 0;
+  // 主壇 = 所有精舍預估貴賓加總（不等回報）
+  const mainCount = participatingTemples.reduce((s, t) => s + (estMap[t.number]?.vip || 0), 0);
+
   participatingTemples.forEach(t => {
     const rep = repMap[t.number];
     const est = estMap[t.number];
@@ -297,14 +300,12 @@ async function fetchDashboard(actId) {
     const 信眾 = (rep.vip || 0) + rep.lay;
     const layMonk = 信眾 + rep.monk;
     const hallCount = layMonk - vipGuest; // 壇區 = 信眾+法師-貴賓
-    totalVipGuest  += vipGuest;
     totalHallCount += hallCount;
     const hall = restMap[t.number] || '（未分配）';
     if (!hallMap[hall]) hallMap[hall] = { count: 0, detail: [] };
     hallMap[hall].count += hallCount;
     hallMap[hall].detail.push({ name: t.name, lay: 信眾, monk: rep.monk, vip: vipGuest, sub: hallCount, total: layMonk });
   });
-  const mainCount = totalVipGuest;
 
   // 精舍視角
   const templeRows = participatingTemples.map(t => {
