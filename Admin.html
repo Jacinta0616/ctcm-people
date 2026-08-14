@@ -274,9 +274,9 @@ tr.total-row td { background:#f0ede8; font-weight:700; border-top:2px solid var(
       </div>
       <div class="table-wrap">
         <table><thead><tr>
-          <th>#</th><th>精舍名稱</th><th>預估信眾</th><th>預估法師</th><th>預估義工</th><th>預設座位數</th><th>休息區說明</th>
+          <th>#</th><th>精舍名稱</th><th>預估信眾</th><th>預估貴賓</th><th>預估法師</th><th>預估義工</th><th>預設座位數</th><th>休息區說明</th>
         </tr></thead>
-        <tbody id="setup-body"><tr><td colspan="7" class="empty-msg">請先選擇活動</td></tr></tbody>
+        <tbody id="setup-body"><tr><td colspan="8" class="empty-msg">請先選擇活動</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -478,7 +478,7 @@ async function fetchDashboard(actId) {
   const setupRows = temples.map(t => {
     const est = estMap[t.number] || {};
     return { number: t.number, name: t.name,
-             lay: (est.vip||0)+(est.lay||0), monk: est.monk||0, volunteer: est.volunteer||0, driver: est.driver||0,
+             vip: est.vip||0, lay: est.lay||0, monk: est.monk||0, volunteer: est.volunteer||0, driver: est.driver||0,
              seat_count: est.seat_count||0, rest: restMap[t.number] || '' };
   });
 
@@ -901,14 +901,14 @@ function openAdminReport(templeNumber) {
 
 function prefillFromEst(num) {
   const est = dashCache.setupRows.find(r => r.number === num) || {};
-  document.getElementById('ar-lay').value          = est.lay    || 0;
+  document.getElementById('ar-lay').value          = (est.vip||0) + (est.lay||0);
   document.getElementById('ar-monk').value         = est.monk   || 0;
   document.getElementById('ar-vol').value          = est.volunteer || 0;
-  document.getElementById('ar-vip').value          = 0;
+  document.getElementById('ar-vip').value          = est.vip    || 0;
   document.getElementById('ar-driver').value       = est.driver || 0;
   document.getElementById('ar-bigcar').value       = 0;
   document.getElementById('ar-late-arrival').value = 0;
-  document.getElementById('ar-return').value       = (est.lay||0) + (est.monk||0);
+  document.getElementById('ar-return').value       = (est.vip||0) + (est.lay||0) + (est.monk||0);
   document.getElementById('ar-name').textContent   = '';
 }
 
@@ -1004,12 +1004,13 @@ function renderSetup() {
       <td style="color:var(--muted);font-size:12px;">${i+1}</td>
       <td><strong>${r.name}</strong></td>
       <td><input type="number" class="setup-num" data-f="lay"       min="0" value="${r.lay}"></td>
+      <td><input type="number" class="setup-num" data-f="vip"       min="0" value="${r.vip||0}"></td>
       <td><input type="number" class="setup-num" data-f="monk"      min="0" value="${r.monk}"></td>
       <td><input type="number" class="setup-num" data-f="volunteer" min="0" value="${r.volunteer||0}"></td>
       <td><input type="number" class="setup-num" data-f="seat_count" min="0" value="${r.seat_count||0}"></td>
       <td><input type="text" class="setup-text" data-f="rest" value="${esc(r.rest)}"></td>
     </tr>`
-  ).join('') || '<tr><td colspan="7" class="empty-msg">精舍名單為空</td></tr>';
+  ).join('') || '<tr><td colspan="8" class="empty-msg">精舍名單為空</td></tr>';
   filterSetupRows();
 }
 function filterSetupRows() {
@@ -1028,17 +1029,18 @@ async function doSaveSetup() {
   document.querySelectorAll('#setup-body tr[data-num]').forEach(tr => {
     const num = tr.getAttribute('data-num');
     const lay        = parseInt(tr.querySelector('[data-f="lay"]').value)        || 0;
+    const vip        = parseInt(tr.querySelector('[data-f="vip"]').value)        || 0;
     const monk       = parseInt(tr.querySelector('[data-f="monk"]').value)       || 0;
     const volunteer  = parseInt(tr.querySelector('[data-f="volunteer"]').value)  || 0;
     const seat_count = parseInt(tr.querySelector('[data-f="seat_count"]').value) || 0;
     const rest       = tr.querySelector('[data-f="rest"]').value.trim();
-    rows.push({ event_id: actId, temple_number: num, vip:0, lay, monk, volunteer, driver:0, seat_count });
+    rows.push({ event_id: actId, temple_number: num, vip, lay, monk, volunteer, driver:0, seat_count });
     if (rest) { rows[rows.length-1]._rest = rest; }
   });
   if (!rows.length) { alert('沒有資料可儲存'); return; }
   setBtn('btn-save-setup', true, '儲存中…');
 
-  const estRows   = rows.map(r => ({ event_id:r.event_id, temple_number:r.temple_number, vip:0, lay:r.lay, monk:r.monk, volunteer:r.volunteer, driver:0, seat_count:r.seat_count }));
+  const estRows   = rows.map(r => ({ event_id:r.event_id, temple_number:r.temple_number, vip:r.vip, lay:r.lay, monk:r.monk, volunteer:r.volunteer, driver:0, seat_count:r.seat_count }));
   const restRows  = rows.filter(r => r._rest).map(r => ({ event_id:r.event_id, temple_number:r.temple_number, description:r._rest }));
   const clearNums = rows.filter(r => !r._rest).map(r => r.temple_number);
 
@@ -1689,27 +1691,28 @@ async function downloadExcel() {
   // Sheet 4：精舍視角
   // ══════════════════════════════════════
   const s2 = wb.addWorksheet('精舍視角');
-  titleRow(s2, c.actName + ' — 精舍視角（含便當數）', 8);
+  titleRow(s2, c.actName + ' — 精舍視角（含便當數）', 9);
   s2.addRow([]); s2.addRow([]);
 
-  hdrRow(s2, ['精舍','信眾','法師','義工','合計（不含便當）','便當數','回點數','回報時間']);
+  hdrRow(s2, ['精舍','信眾','貴賓','法師','義工','合計（不含便當）','便當數','回點數','回報時間']);
 
   c.templeRows.forEach(r => {
-    dataRow(s2, [r.name, r.信眾, r.monk, r.volunteer, r.total, r.driver, r.returnCount, r.reportedAt], null, [2,3,4,5,6,7]);
+    dataRow(s2, [r.name, r.信眾, r.vipGuest||0, r.monk, r.volunteer, r.total, r.driver, r.returnCount, r.reportedAt], null, [2,3,4,5,6,7,8]);
   });
 
   const tt = c.總計;
-  const tRow = s2.addRow(['合計', tt.信眾, tt.monk, tt.volunteer, tt.total, tt.driver, tt.returnCount, '']);
+  const totVip = c.templeRows.reduce((s,r) => s+(r.vipGuest||0), 0);
+  const tRow = s2.addRow(['合計', tt.信眾, totVip, tt.monk, tt.volunteer, tt.total, tt.driver, tt.returnCount, '']);
   tRow.height = 22;
-  for (let i = 1; i <= 8; i++) {
+  for (let i = 1; i <= 9; i++) {
     tRow.getCell(i).fill = GRAY_FILL;
     tRow.getCell(i).font = { bold:true, size:11, color:{ argb:'FF2D4A6E' } };
     tRow.getCell(i).border = BORDER;
     tRow.getCell(i).alignment = i===1 ? MID : CENTER;
   }
 
-  s2.getColumn(1).width = 15; [2,3,4,5,6,7].forEach(i => s2.getColumn(i).width = 8);
-  s2.getColumn(8).width = 22;
+  s2.getColumn(1).width = 15; [2,3,4,5,6,7,8].forEach(i => s2.getColumn(i).width = 8);
+  s2.getColumn(9).width = 22;
   s2.views = [{ state:'frozen', xSplit:0, ySplit:5 }];
 
   // ══════════════════════════════════════
@@ -1723,7 +1726,7 @@ async function downloadExcel() {
   const mMain = dataRow(s3, ['主壇人數', c.mainCount, ''], BLUE_FILL, [2]);
   mMain.getCell(1).font = { bold:true };
   mMain.getCell(2).font = { bold:true, size:14, color:{ argb:'FF2D4A6E' } };
-  dataRow(s3, ['　全場信眾+法師', c.mainCount + c.totalSeatCount, ''], null, [2]);
+  dataRow(s3, ['　全場信眾+法師', c.mainCount + c.totalHallCount, ''], null, [2]);
   dataRow(s3, ['　預設座位數（各休息區）', '－'+c.totalSeatCount, ''], null, [2]);
 
   s3.addRow([]);
