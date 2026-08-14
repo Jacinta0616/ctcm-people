@@ -1349,6 +1349,7 @@ async function handleUploadSetup(input) {
     if (!tr) return;
     const num = tr.getAttribute('data-num');
     tr.querySelector('[data-f="lay"]').value        = parseInt(r[hi('預估信眾')])||0;
+    if (hasVip) tr.querySelector('[data-f="vip"]').value = parseInt(r[hi('預估貴賓')])||0;
     tr.querySelector('[data-f="monk"]').value       = parseInt(r[hi('預估法師')])||0;
     tr.querySelector('[data-f="volunteer"]').value  = parseInt(r[hi('預估義工')])||0;
     tr.querySelector('[data-f="seat_count"]').value = parseInt(r[hi('預設座位數')])||0;
@@ -1403,6 +1404,7 @@ async function handleUploadSetupSingle(input) {
   }
 
   const hi = k => headers.indexOf(k);
+  const hasVipS = headers.includes('預估貴賓');
 
   // 取得精舍對照表（支援有/無補零格式）
   const { data: temples } = await sb.from('temples').select('number, name');
@@ -1420,7 +1422,7 @@ async function handleUploadSetupSingle(input) {
 
     estRows.push({
       event_id: actId, temple_number: t.number,
-      vip:        hasVip ? (parseInt(r[hi('預估貴賓')]) || 0) : 0,
+      vip:        hasVipS ? (parseInt(r[hi('預估貴賓')]) || 0) : 0,
       lay:        parseInt(r[hi('預估信眾')])  || 0,
       monk:       parseInt(r[hi('預估法師')])  || 0,
       volunteer:  parseInt(r[hi('預估義工')])  || 0,
