@@ -416,8 +416,9 @@ async function fetchDashboard(actId) {
   const mainCount = participatingTemples.reduce((s, t) => s + (estMap[t.number]?.vip || 0), 0);
   // 全場信眾+法師 = 預估加總（不等回報）
   const totalEstLayMonk = participatingTemples.reduce((s, t) => {
-    const est = estMap[t.number];
-    return s + (est?.lay||0) + (est?.monk||0);
+    const rep = repMap[t.number];
+    if (!rep) return s;
+    return s + (rep.vip||0) + rep.lay + rep.monk;
   }, 0);
 
   participatingTemples.forEach(t => {
@@ -678,7 +679,7 @@ function renderHall() {
     <div class="hall-title">🏛 主壇</div>
     <div class="hall-count">${c.mainCount} <span>人</span></div>
     <div class="detail-list">
-      <div class="detail-row"><span>全場信眾+法師（預估）</span><span>${c.totalEstLayMonk} 人</span></div>
+      <div class="detail-row"><span>全場信眾+法師（已回報）</span><span>${c.totalEstLayMonk} 人</span></div>
       <div class="detail-row"><span>各壇區貴賓合計</span><span>${c.mainCount} 人</span></div>
     </div></div>`;
   Object.entries(c.hallMap).filter(([hall]) => hall !== '（未分配）').forEach(([hall, v]) => {
