@@ -294,7 +294,7 @@ async function fetchDashboard(actId) {
   // 全場信眾+法師 = 預估加總（不等回報）
   const totalEstLayMonk = participatingTemples.reduce((s, t) => {
     const est = estMap[t.number];
-    return s + (est?.vip||0) + (est?.lay||0) + (est?.monk||0);
+    return s + (est?.lay||0) + (est?.monk||0);
   }, 0);
 
   participatingTemples.forEach(t => {
