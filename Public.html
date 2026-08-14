@@ -291,9 +291,10 @@ async function fetchDashboard(actId) {
   let totalHallCount = 0;
   participatingTemples.forEach(t => {
     const rep = repMap[t.number];
+    const est = estMap[t.number];
     if (!rep) return;
-    const vipGuest = rep.vip || 0;
-    const 信眾 = vipGuest + rep.lay;
+    const vipGuest = est?.vip || 0;
+    const 信眾 = (rep.vip || 0) + rep.lay;
     const layMonk = 信眾 + rep.monk;
     const hallCount = layMonk - vipGuest; // 壇區 = 信眾+法師-貴賓
     totalVipGuest  += vipGuest;
