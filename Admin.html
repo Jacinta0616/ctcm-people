@@ -680,7 +680,9 @@ function renderHall() {
     <div class="hall-count">${c.mainCount} <span>人</span></div>
     <div class="detail-list">
       <div class="detail-row"><span>全場信眾+法師（已回報）</span><span>${c.totalEstLayMonk} 人</span></div>
-      <div class="detail-row"><span>各壇區貴賓合計</span><span>${c.mainCount} 人</span></div>
+      <div class="detail-row" style="margin-top:6px;padding-top:6px;border-top:1px solid rgba(255,255,255,0.2);font-weight:600;"><span>各壇區信眾合計（已回報）</span><span></span></div>
+      ${Object.entries(c.hallMap).filter(([hall]) => hall !== '（未分配）').map(([hall, v]) => `<div class="detail-row"><span>${hall}</span><span>${v.count} 人</span></div>`).join('')}
+      <div class="detail-row" style="margin-top:6px;padding-top:6px;border-top:1px solid rgba(255,255,255,0.2);font-weight:600;"><span>合計</span><span>${c.totalHallCount} 人</span></div>
     </div></div>`;
   Object.entries(c.hallMap).filter(([hall]) => hall !== '（未分配）').forEach(([hall, v]) => {
     html += `<div class="hall-card">
