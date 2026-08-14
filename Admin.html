@@ -262,7 +262,7 @@ tr.total-row td { background:#f0ede8; font-weight:700; border-top:2px solid var(
         <button class="btn btn-outline btn-sm" onclick="document.getElementById('file-setup-single').click()">📤 單筆更新</button>
         <input type="file" id="file-setup" accept=".csv,.xlsx,.xls" style="display:none" onchange="handleUploadSetup(this)">
         <input type="file" id="file-setup-single" accept=".csv,.xlsx,.xls" style="display:none" onchange="handleUploadSetupSingle(this)">
-        <span class="upload-hint" id="setup-upload-hint">格式：精舍編號, 預估信眾/法師/義工/預設座位數/休息區說明（支援 Excel / CSV）｜上傳前請先選好活動並等預估人數列表載入</span>
+        <span class="upload-hint" id="setup-upload-hint">格式：精舍編號, 預估信眾/預估貴賓/法師/義工/預設座位數/休息區說明（支援 Excel / CSV）｜上傳前請先選好活動並等預估人數列表載入</span>
       </div>
       <div class="setup-toolbar">
         <button class="btn btn-success" id="btn-save-setup" onclick="doSaveSetup()">儲存全部</button>
@@ -1286,15 +1286,15 @@ async function dlTemplateSetup() {
   const navy = { type:'pattern', pattern:'solid', fgColor:{ argb:'FF2D4A6E' } };
   const bdr  = { style:'thin', color:{ argb:'FFD0D0D0' } };
   const border = { top:bdr, bottom:bdr, left:bdr, right:bdr };
-  const hdr = ws.addRow(['精舍編號','精舍名稱','預估信眾','預估法師','預估義工','預設座位數','休息區說明']);
+  const hdr = ws.addRow(['精舍編號','精舍名稱','預估信眾','預估貴賓','預估法師','預估義工','預設座位數','休息區說明']);
   hdr.height = 22;
   hdr.eachCell(c => { c.fill = navy; c.font = { bold:true, color:{ argb:'FFFFFFFF' }, size:11 }; c.alignment = { horizontal:'center', vertical:'middle' }; c.border = border; });
   dashCache.setupRows.forEach(r => {
-    const row = ws.addRow([r.number, r.name, r.lay, r.monk, r.volunteer||0, r.seat_count||0, r.rest]); row.height = 20;
+    const row = ws.addRow([r.number, r.name, r.lay, r.vip||0, r.monk, r.volunteer||0, r.seat_count||0, r.rest]); row.height = 20;
     row.eachCell(c => { c.border = border; c.alignment = { vertical:'middle' }; });
     row.getCell(1).numFmt = '@'; // 精舍編號欄強制文字，保留前置零
   });
-  [10, 18, 10, 10, 10, 10, 30].forEach((w, i) => ws.getColumn(i+1).width = w);
+  [10, 18, 10, 10, 10, 10, 10, 30].forEach((w, i) => ws.getColumn(i+1).width = w);
   triggerXlDownload(await wb.xlsx.writeBuffer(), '精舍設定範本.xlsx');
 }
 
@@ -1310,6 +1310,7 @@ async function handleUploadSetup(input) {
     return;
   }
   const hi = k => headers.indexOf(k);
+  const hasVip = headers.includes('預估貴賓');
   const hasName = headers.includes('精舍名稱');
 
   // 建立編號 → row 的對照表，同時支援有補零（01）和沒補零（1）的格式
@@ -1418,7 +1419,8 @@ async function handleUploadSetupSingle(input) {
     if (!t) return;
 
     estRows.push({
-      event_id: actId, temple_number: t.number, vip: 0,
+      event_id: actId, temple_number: t.number,
+      vip:        hasVip ? (parseInt(r[hi('預估貴賓')]) || 0) : 0,
       lay:        parseInt(r[hi('預估信眾')])  || 0,
       monk:       parseInt(r[hi('預估法師')])  || 0,
       volunteer:  parseInt(r[hi('預估義工')])  || 0,
