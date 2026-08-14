@@ -410,34 +410,33 @@ async function fetchDashboard(actId) {
 
   // 殿堂視角
   const hallMap = {};
-  let totalRepLayMonk = 0;
-  let totalSeatCount  = 0;
+  let totalVipGuest = 0;
+  let totalHallCount = 0;
   participatingTemples.forEach(t => {
     const rep = repMap[t.number];
-    const est = estMap[t.number];
     if (!rep) return;
-    const 信眾 = (rep.vip||0) + rep.lay;
+    const vipGuest = rep.vip || 0;
+    const 信眾 = vipGuest + rep.lay;
     const layMonk = 信眾 + rep.monk;
-    const seatCount = est?.seat_count || 0;
-    // 壇區佔用人數 = min(預設座位數, 信眾+法師)
-    const restCount = Math.min(seatCount, layMonk);
-    totalRepLayMonk += layMonk;
-    totalSeatCount  += restCount;
+    const hallCount = layMonk - vipGuest; // 壇區 = 信眾+法師-貴賓
+    totalVipGuest  += vipGuest;
+    totalHallCount += hallCount;
     const hall = restMap[t.number] || '（未分配）';
     if (!hallMap[hall]) hallMap[hall] = { count: 0, detail: [] };
-    hallMap[hall].count += restCount;
-    hallMap[hall].detail.push({ name: t.name, lay: 信眾, monk: rep.monk, sub: restCount, total: layMonk });
+    hallMap[hall].count += hallCount;
+    hallMap[hall].detail.push({ name: t.name, lay: 信眾, monk: rep.monk, vip: vipGuest, sub: hallCount, total: layMonk });
   });
-  const mainCount = totalRepLayMonk - totalSeatCount;
+  const mainCount = totalVipGuest;
 
   // 精舍視角
   const templeRows = participatingTemples
     .map(t => {
       const rep = repMap[t.number];
       if (!rep) return null;
-      const 信眾 = (rep.vip||0) + rep.lay;
+      const vipGuest = rep.vip || 0;
+      const 信眾 = vipGuest + rep.lay;
       const volunteer = rep.volunteer || 0;
-      return { number: t.number, name: t.name, 信眾, monk: rep.monk, volunteer, driver: rep.driver,
+      return { number: t.number, name: t.name, 信眾, vipGuest, monk: rep.monk, volunteer, driver: rep.driver,
                bigCar: rep.big_car || 0,
                returnCount: rep.return_count || 0,
                lateArrival: rep.late_arrival || 0,
@@ -484,7 +483,7 @@ async function fetchDashboard(actId) {
   });
 
   const actName = document.getElementById('activity-select').selectedOptions[0]?.textContent || actId;
-  dashCache = { actId, actName, compRows, mainCount, totalSeatCount, hallMap, mealMap, mealTotal, mealReturnTotal, pickupMap, templeRows, 總計, setupRows,
+  dashCache = { actId, actName, compRows, mainCount, totalVipGuest, totalHallCount, hallMap, mealMap, mealTotal, mealReturnTotal, pickupMap, templeRows, 總計, setupRows,
                 enableLateArrival,
                 未回報數: compRows.filter(r => !r.reported).length };
   document.getElementById('last-update').textContent =
@@ -672,15 +671,15 @@ function renderHall() {
     <div class="hall-title">🏛 主壇</div>
     <div class="hall-count">${c.mainCount} <span>人</span></div>
     <div class="detail-list">
-      <div class="detail-row"><span>全場信眾+法師</span><span>${c.mainCount + c.totalSeatCount} 人</span></div>
-      <div class="detail-row"><span>壇區實際佔用</span><span>－${c.totalSeatCount} 人</span></div>
+      <div class="detail-row"><span>全場信眾+法師</span><span>${c.mainCount + c.totalHallCount} 人</span></div>
+      <div class="detail-row"><span>各壇區貴賓合計</span><span>${c.mainCount} 人</span></div>
     </div></div>`;
   Object.entries(c.hallMap).filter(([hall]) => hall !== '（未分配）').forEach(([hall, v]) => {
     html += `<div class="hall-card">
       <div class="hall-title">📍 ${hall}</div>
       <div class="hall-count">${v.count} <span>人（信眾+法師）</span></div>`;
     if (v.detail.length) html += '<div class="detail-list">' +
-      v.detail.map(d => `<div class="detail-row"><span>${d.name}</span><span>眾 ${d.lay}＋師 ${d.monk} → ${d.sub}</span></div>`).join('') +
+      v.detail.map(d => `<div class="detail-row"><span>${d.name}</span><span>眾 ${d.lay}＋師 ${d.monk}－貴 ${d.vip} → ${d.sub}</span></div>`).join('') +
       '</div>';
     html += '</div>';
   });
@@ -886,6 +885,7 @@ function openAdminReport(templeNumber) {
       document.getElementById('ar-lay').value          = rep.信眾;
       document.getElementById('ar-monk').value         = rep.monk;
       document.getElementById('ar-vol').value          = rep.volunteer;
+      document.getElementById('ar-vip').value          = rep.vipGuest || 0;
       document.getElementById('ar-driver').value       = rep.driver;
       document.getElementById('ar-bigcar').value       = rep.bigCar;
       document.getElementById('ar-return').value       = rep.returnCount;
@@ -904,6 +904,7 @@ function prefillFromEst(num) {
   document.getElementById('ar-lay').value          = est.lay    || 0;
   document.getElementById('ar-monk').value         = est.monk   || 0;
   document.getElementById('ar-vol').value          = est.volunteer || 0;
+  document.getElementById('ar-vip').value          = 0;
   document.getElementById('ar-driver').value       = est.driver || 0;
   document.getElementById('ar-bigcar').value       = 0;
   document.getElementById('ar-late-arrival').value = 0;
@@ -913,18 +914,20 @@ function prefillFromEst(num) {
 
 async function submitAdminReport() {
   const num       = document.getElementById('ar-temple-sel').value;
-  const lay         = parseInt(document.getElementById('ar-lay').value)          || 0;
+  const totalLay    = parseInt(document.getElementById('ar-lay').value)          || 0;
   const monk        = parseInt(document.getElementById('ar-monk').value)         || 0;
   const volunteer   = parseInt(document.getElementById('ar-vol').value)          || 0;
+  const vipGuest    = Math.min(parseInt(document.getElementById('ar-vip').value) || 0, totalLay);
+  const lay         = totalLay - vipGuest;
   const driver      = parseInt(document.getElementById('ar-driver').value)       || 0;
   const bigCar      = parseInt(document.getElementById('ar-bigcar').value)       || 0;
   const lateArrival = parseInt(document.getElementById('ar-late-arrival').value) || 0;
-  const returnCnt   = lay + monk + bigCar + lateArrival;
+  const returnCnt   = totalLay + monk + bigCar + lateArrival;
   if (!num) { document.getElementById('ar-err').textContent = '請選擇精舍'; return; }
 
   const { error } = await sb.from('reports').upsert({
     event_id: dashCache.actId, temple_number: num,
-    vip: 0, lay, monk, volunteer, driver, big_car: bigCar,
+    vip: vipGuest, lay, monk, volunteer, driver, big_car: bigCar,
     late_arrival: lateArrival,
     return_count: returnCnt,
     reported_at: new Date().toISOString()
@@ -1809,6 +1812,13 @@ async function downloadExcel() {
         <input id="ar-monk" type="number" min="0" style="width:100%;padding:8px;border:2px solid #ddd;border-radius:8px;font-size:15px;text-align:center;" oninput="arCalcReturn()"></div>
       <div><label style="font-size:12px;color:var(--muted);">義工</label>
         <input id="ar-vol" type="number" min="0" style="width:100%;padding:8px;border:2px solid #ddd;border-radius:8px;font-size:15px;text-align:center;"></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+      <div><label style="font-size:12px;color:var(--muted);">貴賓（主壇人數）</label>
+        <input id="ar-vip" type="number" min="0" value="0" style="width:100%;padding:8px;border:2px solid #ddd;border-radius:8px;font-size:15px;text-align:center;"></div>
+      <div style="display:flex;align-items:flex-end;padding-bottom:8px;">
+        <span style="font-size:12px;color:var(--muted);line-height:1.5;">殿堂人數 = 參加法會＋法師－貴賓</span>
+      </div>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:10px;">
       <div><label style="font-size:12px;color:var(--muted);">便當數</label>
