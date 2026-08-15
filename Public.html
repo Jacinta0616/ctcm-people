@@ -97,6 +97,9 @@ tr.total-row td { background:#f0ede8; font-weight:700; border-top:2px solid var(
   <div id="tab-comparison" class="tab-content active">
     <div id="comp-stats" class="stat-row"></div>
     <div id="comp-summary"></div>
+    <div id="late-summary-below" style="display:none;margin-top:10px;background:#fff3e0;border-left:4px solid #e65100;border-radius:8px;padding:10px 16px;font-size:14px;color:#bf6000;font-weight:600;">
+      🕐 下午抵達人數合計：<span id="late-summary-num">0</span> 人
+    </div>
     <!-- 密碼鎖 -->
     <div id="detail-lock" style="margin-top:16px;background:#fff;border-radius:12px;padding:28px 24px;text-align:center;box-shadow:0 1px 3px rgba(0,0,0,.07);">
       <div style="font-size:32px;margin-bottom:10px;">🔒</div>
@@ -142,9 +145,6 @@ tr.total-row td { background:#f0ede8; font-weight:700; border-top:2px solid var(
           </thead>
           <tbody id="comp-detail-body"><tr><td colspan="9" class="empty-msg">請先選擇活動</td></tr></tbody>
         </table>
-      </div>
-      <div id="late-summary-below" style="display:none;margin-top:10px;background:#fff3e0;border-left:4px solid #e65100;border-radius:8px;padding:10px 16px;font-size:14px;color:#bf6000;font-weight:600;">
-        🕐 下午抵達人數合計：<span id="late-summary-num">0</span> 人
       </div>
     </div>
   </div>
