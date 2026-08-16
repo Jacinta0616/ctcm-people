@@ -174,11 +174,11 @@ tr.total-row td { background:#f0ede8; font-weight:700; border-top:2px solid var(
               <th rowspan="2" style="vertical-align:middle;">精舍</th>
               <th colspan="3" style="text-align:center;background:#2a4a7a;">── 報名人數 ──</th>
               <th colspan="3" style="text-align:center;background:#1a6030;">── 實到人數 ──</th>
-              <th rowspan="2" style="vertical-align:middle;text-align:center;">預設座位數</th>
-              <th rowspan="2" style="vertical-align:middle;text-align:center;">便當數</th>
-              <th id="comp-th-late" rowspan="2" style="vertical-align:middle;text-align:center;display:none;">下午抵達人數</th>
               <th rowspan="2" style="vertical-align:middle;text-align:center;">落差</th>
               <th rowspan="2" style="vertical-align:middle;text-align:center;">報到率</th>
+              <th id="comp-th-late" rowspan="2" style="vertical-align:middle;text-align:center;display:none;">下午抵達人數</th>
+              <th rowspan="2" style="vertical-align:middle;text-align:center;">預設座位數</th>
+              <th rowspan="2" style="vertical-align:middle;text-align:center;">便當數</th>
               <th rowspan="2" style="vertical-align:middle;text-align:center;">狀態</th>
             </tr>
             <tr>
@@ -657,11 +657,11 @@ function renderComparison() {
         <td style="text-align:center;">${r.reported ? r.repLay  : '—'}</td>
         <td style="text-align:center;">${r.reported ? r.repMonk : '—'}</td>
         <td style="text-align:center;">${r.reported ? r.repVol  : '—'}</td>
-        <td style="text-align:center;">${r.seatCount}</td>
-        <td style="text-align:center;">${r.reported ? r.driver : '—'}</td>
-        ${lateCell(r.lateArrival !== null ? r.lateArrival : '—')}
         <td style="text-align:center;">${diffFmt(r.diffPeople)}</td>
         <td style="text-align:center;">${r.報到率||'—'}</td>
+        ${lateCell(r.lateArrival !== null ? r.lateArrival : '—')}
+        <td style="text-align:center;">${r.seatCount}</td>
+        <td style="text-align:center;">${r.reported ? r.driver : '—'}</td>
         <td>${badge}</td>
       </tr>`;
     }).join('') +
@@ -673,11 +673,11 @@ function renderComparison() {
       <td style="text-align:center;">${totRLay}</td>
       <td style="text-align:center;">${totRMonk}</td>
       <td style="text-align:center;">${totRVol}</td>
-      <td style="text-align:center;">${totSeat}</td>
-      <td style="text-align:center;">${totDriver}</td>
-      ${lateCell(totLateArr)}
       <td style="text-align:center;">${diffFmt(totDiff)}</td>
       <td style="text-align:center;">${totRate}</td>
+      ${lateCell(totLateArr)}
+      <td style="text-align:center;">${totSeat}</td>
+      <td style="text-align:center;">${totDriver}</td>
       <td></td>
     </tr>`
     || `<tr><td colspan="${colspan}" class="empty-msg">無資料</td></tr>`;
