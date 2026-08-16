@@ -98,7 +98,7 @@ tr.total-row td { background:#f0ede8; font-weight:700; border-top:2px solid var(
     <div id="comp-stats" class="stat-row"></div>
     <div id="comp-summary"></div>
     <div id="late-summary-below" class="hall-card" style="display:none;margin-top:10px;border-left:4px solid #e65100;justify-content:space-between;align-items:center;">
-      <div style="font-size:14px;font-weight:600;color:#e65100;">以上人數含下午抵達人數合計</div>
+      <div style="font-size:17px;font-weight:600;color:#e65100;">以上人數含下午抵達人數合計</div>
       <div style="font-size:28px;font-weight:800;color:#e65100;"><span id="late-summary-num">0</span> 人</div>
     </div>
     <!-- 密碼鎖 -->
@@ -415,7 +415,7 @@ function renderComparison() {
       ${summaryCard('✅ 實到', c.repSummary, '#2e7d32')}
     </div>
     <div class="hall-card" style="border-left:4px solid ${diffColor};display:flex;justify-content:space-between;align-items:center;">
-      <div style="font-size:14px;font-weight:600;color:${diffColor};">差異總計（實到－報名）</div>
+      <div style="font-size:17px;font-weight:600;color:${diffColor};">差異總計（實到－報名）</div>
       <div style="font-size:28px;font-weight:800;color:${diffColor};">${c.estSummary.total > 0 ? diffStr : '—'}</div>
     </div>`;
 
