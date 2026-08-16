@@ -505,7 +505,7 @@ function renderHall() {
       <div class="hall-title">📍 ${hall}</div>
       <div class="hall-count">${v.count} <span>人（信眾+法師）</span></div>`;
     if (v.detail.length) html += '<div class="detail-list">' +
-      v.detail.map(d => `<div class="detail-row"><span>${d.name}</span><span>眾 ${d.lay}＋師 ${d.monk}－貴 ${d.vip} → ${d.sub}</span></div>`).join('') + '</div>';
+      v.detail.map(d => `<div class="detail-row"><span>${d.name}</span><span>${d.sub} 人</span></div>`).join('') + '</div>';
     html += '</div>';
   });
   document.getElementById('hall-content').innerHTML = html + '</div>';
