@@ -547,7 +547,7 @@ function renderMeal() {
       <div class="hall-title">🍱 ${hall}</div>
       <div class="hall-count">${v.count} <span>份</span></div>`;
     if (v.detail.length) html += '<div class="detail-list">' +
-      v.detail.map(d => `<div class="detail-row"><span>${d.name}</span><span>${d.count} 份</span></div>`).join('') + '</div>';
+      v.detail.map(d => `<div class="detail-row" style="font-size:18px;padding:4px 0;"><span style="font-weight:600;">${d.name}</span><span>${d.count} 份</span></div>`).join('') + '</div>';
     html += '</div>';
   });
   html += `<div class="hall-card" style="background:#f0ede8;">
