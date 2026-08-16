@@ -292,6 +292,11 @@ const ADMIN_PASSWORD = 'ctcm2026'; // 可自行修改
 // ────────────────────────────────────────────────────────────
 
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+async function sha256(str) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
+}
 let currentTab  = 'comparison';
 let dashCache   = null;
 let compFilter  = 'all'; // 'all' | 'reported' | 'unreported'
@@ -1272,14 +1277,15 @@ async function handleUploadTemple(input) {
     await sb.from('temples').delete().in('number', toDelete);
   }
 
-  // 寫入新名單（強制覆蓋帳號衝突）
+  // 寫入新名單（強制覆蓋帳號衝突，密碼先 SHA-256 再存）
   let ok = 0; const errList = [];
   for (const t of data) {
+    const row = { ...t, password: await sha256(t.password) };
     await sb.from('temples')
       .update({ account: `_old_${t.number}` })
       .eq('account', t.account)
       .neq('number', t.number);
-    const { error } = await sb.from('temples').upsert(t, { onConflict: 'number' });
+    const { error } = await sb.from('temples').upsert(row, { onConflict: 'number' });
     if (error) errList.push(`${t.name}：${error.message}`);
     else ok++;
   }

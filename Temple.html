@@ -18,7 +18,7 @@ header h1 { font-size:17px; font-weight:600; }
 header p  { font-size:13px; opacity:.75; margin-top:2px; }
 .container { padding:14px; max-width:480px; margin:0 auto; }
 .card { background:var(--card); border-radius:var(--radius); padding:16px; margin-bottom:12px; box-shadow:0 1px 4px rgba(0,0,0,.08); }
-.card-label { font-size:13px; color:#444; letter-spacing:.8px; text-transform:uppercase; margin-bottom:4px; }
+.card-label { font-size:14px; color:#222; letter-spacing:.8px; text-transform:uppercase; margin-bottom:4px; }
 .card-value { font-size:19px; font-weight:700; color:var(--navy); }
 .login-wrap { padding:32px 16px; max-width:360px; margin:0 auto; }
 .login-logo { text-align:center; margin-bottom:28px; }
@@ -32,7 +32,7 @@ header p  { font-size:13px; opacity:.75; margin-top:2px; }
 .btn:disabled { opacity:.6; }
 .btn-outline { background:white; color:var(--navy); border:2px solid var(--navy); margin-top:10px; }
 .grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin:12px 0; }
-.inp-group label { display:block; font-size:15px; color:#444; margin-bottom:4px; text-align:center; }
+.inp-group label { display:block; font-size:17px; color:#222; margin-bottom:4px; text-align:center; }
 .inp-group input[type="number"] { width:100%; padding:12px 4px; font-size:24px; font-weight:700; border:2px solid #e0e0e0; border-radius:8px; text-align:center; color:var(--navy); background:white; }
 .inp-group input[type="number"]:focus { border-color:var(--navy); outline:none; }
 .inp-group input[type="text"] { width:100%; padding:11px 12px; font-size:15px; border:2px solid #e0e0e0; border-radius:8px; }
@@ -44,7 +44,7 @@ header p  { font-size:13px; opacity:.75; margin-top:2px; }
 .driver-row { display:flex; justify-content:space-between; align-items:center; border-top:1px dashed #ddd; margin-top:8px; padding-top:8px; }
 .mini-item { text-align:center; }
 .mini-item .n { font-size:20px; font-weight:700; color:var(--navy); }
-.mini-item .l { font-size:13px; color:#444; }
+.mini-item .l { font-size:14px; color:#222; }
 .success-wrap { text-align:center; padding:36px 20px; }
 .check-circle { width:72px; height:72px; border-radius:50%; background:var(--success); color:white; font-size:36px; display:flex; align-items:center; justify-content:center; margin:0 auto 16px; }
 .success-title { font-size:22px; font-weight:700; color:var(--success); margin-bottom:6px; }
@@ -218,16 +218,22 @@ function show(id) {
   document.getElementById(id).classList.add('active');
 }
 
+async function sha256(str) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
+}
+
 async function doLogin() {
   const account  = document.getElementById('inp-account').value.trim();
   const password = document.getElementById('inp-password').value.trim();
   if (!account || !password) { setErr('請輸入帳號和密碼'); return; }
   setBtn('btn-login', true, '登入中…');
 
+  const hashedPw = await sha256(password);
   const { data, error } = await sb.from('temples')
     .select('number, name')
     .eq('account', account)
-    .eq('password', password);
+    .eq('password', hashedPw);
 
   setBtn('btn-login', false, '登入');
   if (error || !data?.length) { setErr('帳號或密碼錯誤'); return; }
