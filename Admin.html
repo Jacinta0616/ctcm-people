@@ -554,7 +554,7 @@ function renderTransport() {
         </tr></thead>
         <tbody>
           ${rows.map(r => `<tr>
-            <td><span style="color:var(--muted);font-size:12px;margin-right:4px;">${r.number}</span>${r.name}</td>
+            <td><span style="color:var(--muted);font-size:12px;margin-right:4px;">${r.number}</span><span style="font-size:17px;">${r.name}</span></td>
             <td style="text-align:center;font-size:20px;font-weight:700;color:var(--navy);">${r.bigCar}</td>
           </tr>`).join('')}
           <tr class="total-row">
