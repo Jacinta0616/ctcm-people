@@ -571,18 +571,18 @@ function renderService() {
       <div style="font-size:13px;color:var(--muted);margin-bottom:10px;">
         便當 ${v.driver} 份　回點 ${v.returnCount} 點
       </div>
-      <div style="display:flex;flex-direction:column;gap:10px;">
+      <div style="display:flex;flex-direction:column;gap:0;">
         ${v.detail.map(d => `
-          <div style="border-top:1px solid #eee;padding-top:8px;">
-            <div style="font-size:14px;font-weight:600;color:#333;margin-bottom:6px;">${d.name}</div>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;text-align:center;">
-              <div style="background:#e8f0fb;border-radius:8px;padding:8px 4px;">
-                <div style="font-size:11px;color:var(--muted);margin-bottom:2px;">便當數</div>
-                <div style="font-size:28px;font-weight:800;color:var(--navy);">${d.driver}</div>
+          <div style="display:flex;align-items:center;justify-content:space-between;border-top:1px solid #eee;padding:8px 0;">
+            <div style="font-size:15px;font-weight:600;color:#333;flex:1;">${d.name}</div>
+            <div style="display:flex;gap:16px;text-align:center;">
+              <div>
+                <div style="font-size:11px;color:var(--muted);">便當</div>
+                <div style="font-size:28px;font-weight:800;color:var(--navy);line-height:1.1;">${d.driver}</div>
               </div>
-              <div style="background:#e8f5e9;border-radius:8px;padding:8px 4px;">
-                <div style="font-size:11px;color:var(--muted);margin-bottom:2px;">回點數</div>
-                <div style="font-size:28px;font-weight:800;color:#2e7d32;">${d.returnCount}</div>
+              <div>
+                <div style="font-size:11px;color:var(--muted);">回點</div>
+                <div style="font-size:28px;font-weight:800;color:#2e7d32;line-height:1.1;">${d.returnCount}</div>
               </div>
             </div>
           </div>`).join('')}
