@@ -92,6 +92,7 @@ tr.total-row td { background:#f0ede8; font-weight:700; border-top:2px solid var(
     <button class="tab-btn" onclick="switchTab('hall')">殿堂視角</button>
     <button class="tab-btn" onclick="switchTab('meal')">齋供視角</button>
     <button class="tab-btn" onclick="switchTab('transport')">交通視角</button>
+    <button class="tab-btn" onclick="switchTab('service')">服務台視角</button>
   </div>
 
   <div id="tab-comparison" class="tab-content active">
@@ -162,6 +163,10 @@ tr.total-row td { background:#f0ede8; font-weight:700; border-top:2px solid var(
     <div id="transport-content"><div class="empty-msg">請先選擇活動</div></div>
   </div>
 
+  <div id="tab-service" class="tab-content">
+    <div id="service-content"><div class="empty-msg">請先選擇活動</div></div>
+  </div>
+
 </div>
 
 <script>
@@ -194,7 +199,7 @@ function lockDetail() {
   document.getElementById('detail-lock').style.display = 'block';
   document.getElementById('detail-pw').value = '';
 }
-const ALL_TABS = ['comparison','hall','meal','transport'];
+const ALL_TABS = ['comparison','hall','meal','transport','service'];
 
 async function init() {
   const { data } = await sb.from('events').select('id,name,status').order('date', { ascending: false });
@@ -323,7 +328,7 @@ async function fetchDashboard(actId) {
     const 信眾 = (rep.vip||0) + rep.lay;
     const volunteer = rep.volunteer || 0;
     return { number: t.number, name: t.name, 信眾, monk: rep.monk, volunteer, driver: rep.driver,
-             bigCar: rep.big_car || 0,
+             bigCar: rep.big_car || 0, returnCount: rep.return_count || 0,
              total: 信眾+rep.monk+volunteer,
              reportedAt: new Date(rep.reported_at).toLocaleString('zh-TW',{timeZone:'Asia/Taipei'}) };
   }).filter(Boolean);
@@ -345,7 +350,23 @@ async function fetchDashboard(actId) {
     mealTotal += rep.driver;
   });
 
+  // 服務台視角
+  const serviceMap = {};
+  let serviceDriverTotal = 0, serviceReturnTotal = 0;
+  participatingTemples.forEach(t => {
+    const rep = repMap[t.number];
+    if (!rep) return;
+    const hall = restMap[t.number] || '（未分配）';
+    if (!serviceMap[hall]) serviceMap[hall] = { driver: 0, returnCount: 0, detail: [] };
+    serviceMap[hall].driver += rep.driver;
+    serviceMap[hall].returnCount += rep.return_count || 0;
+    serviceMap[hall].detail.push({ name: t.name, driver: rep.driver, returnCount: rep.return_count || 0 });
+    serviceDriverTotal += rep.driver;
+    serviceReturnTotal += rep.return_count || 0;
+  });
+
   dashCache = { compRows, estSummary, repSummary, mainCount, totalEstLayMonk, totalHallCount, hallMap, templeRows, 總計, mealMap, mealTotal,
+                serviceMap, serviceDriverTotal, serviceReturnTotal,
                 未回報數: compRows.filter(r => !r.reported).length, enableLateArrival };
   document.getElementById('last-update').textContent =
     '更新：' + new Date().toLocaleTimeString('zh-TW',{timeZone:'Asia/Taipei'});
@@ -370,6 +391,7 @@ function renderCurrentTab() {
   else if (currentTab === 'hall')   renderHall();
   else if (currentTab === 'meal')      renderMeal();
   else if (currentTab === 'transport') renderTransport();
+  else if (currentTab === 'service')   renderService();
 }
 
 function renderComparison() {
@@ -533,6 +555,48 @@ function renderMeal() {
     <div class="hall-count">${c.mealTotal} <span>份</span></div>
   </div>`;
   document.getElementById('meal-content').innerHTML = html + '</div>';
+}
+
+function renderService() {
+  const c = dashCache;
+  const entries = Object.entries(c.serviceMap).filter(([hall]) => hall !== '（未分配）');
+  if (!entries.length) {
+    document.getElementById('service-content').innerHTML = '<div class="empty-msg">尚無回報資料</div>';
+    return;
+  }
+  let html = '<div class="hall-grid">';
+  entries.forEach(([hall, v]) => {
+    html += `<div class="hall-card">
+      <div class="hall-title">📋 ${hall}</div>
+      <div style="font-size:13px;color:var(--muted);margin-bottom:10px;">
+        便當 ${v.driver} 份　回點 ${v.returnCount} 點
+      </div>
+      <div style="display:flex;flex-direction:column;gap:10px;">
+        ${v.detail.map(d => `
+          <div style="border-top:1px solid #eee;padding-top:8px;">
+            <div style="font-size:14px;font-weight:600;color:#333;margin-bottom:6px;">${d.name}</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;text-align:center;">
+              <div style="background:#e8f0fb;border-radius:8px;padding:8px 4px;">
+                <div style="font-size:11px;color:var(--muted);margin-bottom:2px;">便當數</div>
+                <div style="font-size:28px;font-weight:800;color:var(--navy);">${d.driver}</div>
+              </div>
+              <div style="background:#e8f5e9;border-radius:8px;padding:8px 4px;">
+                <div style="font-size:11px;color:var(--muted);margin-bottom:2px;">回點數</div>
+                <div style="font-size:28px;font-weight:800;color:#2e7d32;">${d.returnCount}</div>
+              </div>
+            </div>
+          </div>`).join('')}
+      </div>
+    </div>`;
+  });
+  html += `<div class="hall-card" style="background:#f0ede8;">
+    <div class="hall-title">📊 總計</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;text-align:center;margin-top:8px;">
+      <div><div style="font-size:12px;color:var(--muted);">便當總計</div><div style="font-size:22px;font-weight:800;color:var(--navy);">${c.serviceDriverTotal} <span style="font-size:14px;">份</span></div></div>
+      <div><div style="font-size:12px;color:var(--muted);">回點總計</div><div style="font-size:22px;font-weight:800;color:#2e7d32;">${c.serviceReturnTotal} <span style="font-size:14px;">點</span></div></div>
+    </div>
+  </div>`;
+  document.getElementById('service-content').innerHTML = html + '</div>';
 }
 
 init();
