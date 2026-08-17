@@ -268,7 +268,8 @@ async function fetchDashboard(actId) {
     const estPeople = estLay + estMonk + estVol;
     const repPeople = rep ? repLay + repMonk + repVol : null;
     const diffPeople = repPeople !== null ? repPeople - estPeople : null;
-    return { number: t.number, name: t.name, reported: !!rep, estLay, estMonk, estVol, estPeople, repLay, repMonk, repVol, repPeople, diffPeople,
+    const 報到率 = repPeople !== null && estPeople > 0 ? ((repPeople / estPeople) * 100).toFixed(1) + '%' : null;
+    return { number: t.number, name: t.name, reported: !!rep, estLay, estMonk, estVol, estPeople, repLay, repMonk, repVol, repPeople, diffPeople, 報到率,
              seatCount: est.seat_count || 0, driver: rep ? rep.driver : null,
              lateArrival: rep ? (rep.late_arrival || 0) : null };
   });
