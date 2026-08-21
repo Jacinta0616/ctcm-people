@@ -92,6 +92,9 @@ tr.total-row td { background:#f0ede8; font-weight:700; border-top:2px solid var(
 .tab-content.active { display:block; }
 .error-msg { color:var(--danger); font-size:14px; text-align:center; margin-top:8px; min-height:20px; }
 .empty-msg { text-align:center; padding:40px; color:var(--muted); font-size:14px; }
+#comp-table { font-size:12px; }
+#comp-table th { padding:8px 6px; }
+#comp-table td { padding:6px 6px; }
 .upload-bar { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:12px; }
 .upload-hint { font-size:12px; color:var(--muted); }
 .btn-teal { background:#e0f2f1; color:#00695c; border:1px solid #b2dfdb; font-weight:600; }
@@ -168,10 +171,10 @@ tr.total-row td { background:#f0ede8; font-weight:700; border-top:2px solid var(
           oninput="compSearch=this.value;renderComparison(dashCache.compRows)">
       </div>
       <div class="table-wrap">
-        <table>
+        <table id="comp-table">
           <thead>
             <tr>
-              <th rowspan="2" style="vertical-align:middle;max-width:90px;">精舍</th>
+              <th rowspan="2" style="vertical-align:middle;">精舍</th>
               <th colspan="4" style="text-align:center;background:#2a4a7a;">── 報名人數 ──</th>
               <th colspan="4" style="text-align:center;background:#1a6030;">── 實到人數 ──</th>
               <th rowspan="2" style="vertical-align:middle;text-align:center;">落差</th>
@@ -651,7 +654,7 @@ function renderComparison() {
         ? '<span class="badge badge-ok">已回報</span>'
         : '<span class="badge badge-wait">未回報</span>';
       return `<tr${cls}>
-        <td style="white-space:normal;max-width:90px;"><span style="color:var(--muted);font-size:12px;margin-right:4px;">${r.number}</span>${r.name}</td>
+        <td><span style="color:var(--muted);font-size:12px;margin-right:4px;">${r.number}</span>${r.name}</td>
         <td style="text-align:center;">${r.estLay}</td>
         <td style="text-align:center;">${r.estMonk}</td>
         <td style="text-align:center;">${r.estVol}</td>
