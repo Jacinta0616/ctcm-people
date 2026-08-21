@@ -593,11 +593,11 @@ function renderService() {
       </div>
       <div style="display:flex;flex-direction:column;gap:0;">
         ${v.detail.map(d => `
-          <div style="display:flex;align-items:center;justify-content:space-between;border-top:1px solid #f0f0f0;padding:6px 0;gap:8px;">
-            <div style="font-size:20px;font-weight:600;color:#333;flex:1;min-width:0;">${d.name}</div>
-            <div style="display:flex;gap:12px;text-align:center;flex-shrink:0;">
-              <div style="font-size:28px;font-weight:800;color:var(--navy);width:52px;">${d.driver}</div>
-              <div style="font-size:28px;font-weight:800;color:#2e7d32;width:52px;">${d.returnCount}</div>
+          <div style="display:flex;align-items:center;justify-content:space-between;border-top:1px solid #f0f0f0;padding:6px 0;">
+            <div style="font-size:28px;font-weight:600;color:#333;flex:1;">${d.name}</div>
+            <div style="display:flex;gap:16px;text-align:center;">
+              <div style="font-size:28px;font-weight:800;color:var(--navy);width:56px;">${d.driver}</div>
+              <div style="font-size:28px;font-weight:800;color:#2e7d32;width:56px;">${d.returnCount}</div>
             </div>
           </div>`).join('')}
       </div>
