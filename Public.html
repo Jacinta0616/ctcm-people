@@ -134,7 +134,7 @@ tr.total-row td { background:#f0ede8; font-weight:700; border-top:2px solid var(
         <table>
           <thead>
             <tr>
-              <th rowspan="2" style="vertical-align:middle;">精舍</th>
+              <th rowspan="2" style="vertical-align:middle;max-width:90px;">精舍</th>
               <th colspan="4" style="text-align:center;background:#2a4a7a;">── 報名人數 ──</th>
               <th colspan="4" style="text-align:center;background:#1a6030;">── 實到人數 ──</th>
               <th rowspan="2" style="vertical-align:middle;text-align:center;">落差</th>
@@ -472,7 +472,7 @@ function renderComparison() {
 
   document.getElementById('comp-detail-body').innerHTML =
     sorted.map(r => `<tr${!r.reported?' class="unreported"':''}>
-      <td><span style="color:var(--muted);font-size:12px;margin-right:4px;">${r.number}</span>${r.name}${!r.reported ? ' <span class="badge badge-wait" style="font-size:10px;">未回報</span>' : ''}</td>
+      <td style="white-space:normal;max-width:90px;"><span style="color:var(--muted);font-size:12px;margin-right:4px;">${r.number}</span>${r.name}${!r.reported ? ' <span class="badge badge-wait" style="font-size:10px;">未回報</span>' : ''}</td>
       <td style="text-align:center;">${r.estLay}</td>
       <td style="text-align:center;">${r.estMonk}</td>
       <td style="text-align:center;">${r.estVol}</td>
