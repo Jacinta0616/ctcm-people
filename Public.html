@@ -410,12 +410,14 @@ function renderComparison() {
   const diffColor = diff >= 0 ? '#1565c0' : 'var(--danger)';
   const repRows = c.compRows.filter(r => r.reported);
   const totLateArr = repRows.reduce((s,r) => s+(r.lateArrival||0), 0);
+  const totDriver  = repRows.reduce((s,r) => s+(r.driver||0), 0);
 
   document.getElementById('comp-stats').innerHTML = [
     { lbl:'參與精舍', num: c.compRows.length },
     { lbl:'已回報',   num: reported },
     { lbl:'未回報',   num: c.未回報數, warn: c.未回報數 > 0 },
     { lbl:'報到率',   num: 報到率 },
+    { lbl:'便當總數', num: totDriver },
   ].map(s => `<div class="stat-card${s.warn?' warn':''}"><div class="num">${s.num}</div><div class="lbl">${s.lbl}</div></div>`).join('');
 
   function summaryCard(title, data, accentColor, extraItems = []) {
@@ -454,7 +456,6 @@ function renderComparison() {
   const totRLay   = repRows.reduce((s,r) => s+r.repLay,  0);
   const totRMonk  = repRows.reduce((s,r) => s+r.repMonk, 0);
   const totRVol   = repRows.reduce((s,r) => s+r.repVol,  0);
-  const totDriver = repRows.reduce((s,r) => s+r.driver,  0);
   const totDiff    = (totRLay+totRMonk+totRVol) - (totELay+totEMonk+totEVol);
   const totEPpl    = totELay + totEMonk + totEVol;
   const totRPpl    = totRLay + totRMonk + totRVol;

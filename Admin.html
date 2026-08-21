@@ -584,13 +584,16 @@ function renderComparison() {
   const rows = dashCache.compRows;
   const reported = rows.filter(r => r.reported).length;
   const repSum   = rows.reduce((a,r) => a+(r.repTotal||0), 0);
+  const repRows  = rows.filter(r => r.reported);
+  const totDriver = repRows.reduce((s,r) => s+(r.driver||0), 0);
 
   // 統計卡片（已回報 / 未回報 可點擊篩選）
   document.getElementById('comp-stats').innerHTML =
     sc(rows.length, '精舍總數', false, '') +
     sc(reported, '已回報', false, 'onclick="setCompFilter(compFilter===\'reported\'?\'all\':\'reported\')"') +
     sc(dashCache.未回報數, '尚未回報', dashCache.未回報數>0, 'onclick="setCompFilter(compFilter===\'unreported\'?\'all\':\'unreported\')"') +
-    sc(repSum, '目前實際總人數', false, '');
+    sc(repSum, '目前實際總人數', false, '') +
+    sc(totDriver, '便當總數', false, '');
 
   // 加上可點擊樣式
   document.querySelectorAll('#comp-stats .stat-card').forEach((el, i) => {
@@ -626,7 +629,6 @@ function renderComparison() {
 
   // 合計列（永遠基於所有精舍，不跟篩選走）
   const allRows  = rows;
-  const repRows  = allRows.filter(r => r.reported);
   const totELay  = allRows.reduce((s,r) => s+r.estLay,  0);
   const totEMonk = allRows.reduce((s,r) => s+r.estMonk, 0);
   const totEVol  = allRows.reduce((s,r) => s+r.estVol,  0);
@@ -638,7 +640,6 @@ function renderComparison() {
   const totRPpl      = totRLay + totRMonk + totRVol;
   const totRate      = totEPpl > 0 ? Math.round(totRPpl / totEPpl * 100) + '%' : '—';
   const totSeat      = allRows.reduce((s,r) => s+r.seatCount, 0);
-  const totDriver    = repRows.reduce((s,r) => s+r.driver,    0);
   const totLateArr   = repRows.reduce((s,r) => s+(r.lateArrival||0), 0);
   const lateCell     = (val) => late ? `<td style="text-align:center;">${val}</td>` : '';
   const colspan      = late ? 15 : 14;
