@@ -143,13 +143,14 @@ tr.total-row td { background:#f0ede8; font-weight:700; border-top:2px solid var(
               <th rowspan="2" style="vertical-align:middle;text-align:center;">報到率</th>
               <th rowspan="2" style="vertical-align:middle;text-align:center;">預設座位數</th>
               <th rowspan="2" style="vertical-align:middle;text-align:center;">便當數</th>
+              <th rowspan="2" style="vertical-align:middle;text-align:center;">回點數</th>
             </tr>
             <tr>
               <th>參加法會</th><th>法師</th><th>義工</th><th>小計</th>
               <th>參加法會</th><th>法師</th><th>義工</th><th>小計</th>
             </tr>
           </thead>
-          <tbody id="comp-detail-body"><tr><td colspan="13" class="empty-msg">請先選擇活動</td></tr></tbody>
+          <tbody id="comp-detail-body"><tr><td colspan="14" class="empty-msg">請先選擇活動</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -273,6 +274,7 @@ async function fetchDashboard(actId) {
     const 報到率 = repPeople !== null && estPeople > 0 ? ((repPeople / estPeople) * 100).toFixed(1) + '%' : null;
     return { number: t.number, name: t.name, reported: !!rep, estLay, estMonk, estVol, estPeople, repLay, repMonk, repVol, repPeople, diffPeople, 報到率,
              seatCount: est.seat_count || 0, driver: rep ? rep.driver : null,
+             returnCount: rep ? (rep.return_count || 0) : null,
              lateArrival: rep ? (rep.late_arrival || 0) : null };
   });
 
@@ -413,6 +415,7 @@ function renderComparison() {
   const repRows = c.compRows.filter(r => r.reported);
   const totLateArr = repRows.reduce((s,r) => s+(r.lateArrival||0), 0);
   const totDriver  = repRows.reduce((s,r) => s+(r.driver||0), 0);
+  const totReturnCount = repRows.reduce((s,r) => s+(r.returnCount||0), 0);
 
   document.getElementById('comp-stats').innerHTML = [
     { lbl:'參與精舍', num: c.compRows.length },
@@ -488,6 +491,7 @@ function renderComparison() {
       <td style="text-align:center;">${r.報到率||'—'}</td>
       <td style="text-align:center;">${r.seatCount}</td>
       <td style="text-align:center;">${r.reported ? r.driver : '—'}</td>
+      <td style="text-align:center;">${r.reported ? r.returnCount : '—'}</td>
     </tr>`).join('') +
     `<tr style="background:#f0ede8;font-weight:700;border-top:2px solid var(--navy);">
       <td>合計（已回報 ${repRows.length}／${rows.length} 間）</td>
@@ -497,6 +501,7 @@ function renderComparison() {
       <td style="text-align:center;">${totRate}</td>
       <td style="text-align:center;">${totSeat}</td>
       <td style="text-align:center;">${totDriver}</td>
+      <td style="text-align:center;">${totReturnCount}</td>
     </tr>`;
 }
 
