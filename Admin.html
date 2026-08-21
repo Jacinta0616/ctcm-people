@@ -595,7 +595,8 @@ function renderComparison() {
     sc(reported, '已回報', false, 'onclick="setCompFilter(compFilter===\'reported\'?\'all\':\'reported\')"') +
     sc(dashCache.未回報數, '尚未回報', dashCache.未回報數>0, 'onclick="setCompFilter(compFilter===\'unreported\'?\'all\':\'unreported\')"') +
     sc(repSum, '目前實際總人數', false, '') +
-    sc(totDriver, '便當總數', false, '');
+    sc(totDriver, '便當總數', false, '') +
+    sc(dashCache.mealReturnTotal||0, '回點總數', false, '');
 
   // 加上可點擊樣式
   document.querySelectorAll('#comp-stats .stat-card').forEach((el, i) => {
