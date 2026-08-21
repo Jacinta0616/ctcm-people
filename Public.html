@@ -422,8 +422,6 @@ function renderComparison() {
     { lbl:'已回報',   num: reported },
     { lbl:'未回報',   num: c.未回報數, warn: c.未回報數 > 0 },
     { lbl:'報到率',   num: 報到率 },
-    { lbl:'便當總數', num: totDriver },
-    { lbl:'回點總數', num: c.serviceReturnTotal||0 },
   ].map(s => `<div class="stat-card${s.warn?' warn':''}"><div class="num">${s.num}</div><div class="lbl">${s.lbl}</div></div>`).join('');
 
   function summaryCard(title, data, accentColor, extraItems = []) {
