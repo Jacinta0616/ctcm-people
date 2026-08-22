@@ -143,7 +143,7 @@ header p  { font-size:13px; opacity:.75; margin-top:2px; }
         <div class="inp-group"><label>法師</label><input type="number" id="f-monk" min="0" value="0" oninput="calcTotal()"></div>
         <div class="inp-group"><label>義工</label><input type="number" id="f-volunteer" min="0" value="0" oninput="calcTotal()"></div>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:0 0 10px;">
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin:0 0 10px;">
         <div class="inp-group">
           <label>便當數 <span style="font-size:11px;color:#bbb;font-weight:400;">(回山－義工－貴賓)</span></label>
           <input type="number" id="f-driver" min="0" value="0" oninput="calcTotal()">
@@ -151,6 +151,10 @@ header p  { font-size:13px; opacity:.75; margin-top:2px; }
         <div class="inp-group">
           <label>大車數 <span style="font-size:11px;color:#bbb;font-weight:400;">(遊覽車台數)</span></label>
           <input type="number" id="f-bigcar" min="0" value="0" oninput="calcTotal()">
+        </div>
+        <div class="inp-group">
+          <label>回點數</label>
+          <input type="number" id="f-return-count" min="0" value="0">
         </div>
       </div>
       <div id="late-input-row" style="margin:0 0 10px;display:none;">
@@ -167,20 +171,14 @@ header p  { font-size:13px; opacity:.75; margin-top:2px; }
         <span>合計人數（信眾＋法師＋義工）</span>
         <span class="total-num" id="total-num">0</span>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;margin-top:10px;padding-top:10px;border-top:1px dashed #ddd;text-align:center;">
+      <div style="display:grid;grid-template-columns:1fr 1fr;margin-top:10px;padding-top:10px;border-top:1px dashed #ddd;text-align:center;">
         <div style="padding:8px 4px;border-right:1px dashed #ddd;">
           <div style="font-size:12px;color:var(--muted);margin-bottom:6px;">便當數</div>
           <div style="font-size:26px;font-weight:800;color:var(--muted);" id="driver-display">0</div>
         </div>
-        <div style="padding:8px 4px;border-right:1px dashed #ddd;">
+        <div style="padding:8px 4px;">
           <div style="font-size:12px;color:var(--muted);margin-bottom:6px;">大車數</div>
           <div style="font-size:26px;font-weight:800;color:var(--muted);" id="bigcar-display">0</div>
-        </div>
-        <div style="padding:8px 4px;">
-          <div style="font-size:12px;color:var(--muted);">回點數</div>
-          <div style="font-size:10px;color:var(--muted);margin-bottom:4px;">(可修改)</div>
-          <input type="number" id="return-count-display" min="0" value="0"
-            style="font-size:26px;font-weight:800;color:var(--navy);width:75%;border:none;border-bottom:1px dashed var(--navy);background:transparent;text-align:center;padding:0;">
         </div>
       </div>
       <div id="late-display-row" style="margin-top:6px;padding-top:8px;border-top:1px dashed #ddd;text-align:center;display:none;">
@@ -353,7 +351,7 @@ function renderMain(rest, est, prev) {
     document.getElementById('f-late-arrival').value = prev.late_arrival || 0;
     document.getElementById('f-note').value         = prev.note || '';
     calcTotal();
-    document.getElementById('return-count-display').value = prev.return_count || 0;
+    document.getElementById('f-return-count').value = prev.return_count || 0;
   }
   show('screen-main');
 }
@@ -367,7 +365,6 @@ function calcTotal() {
   document.getElementById('total-num').textContent      = lay + monk + vol;
   document.getElementById('driver-display').textContent = parseInt(document.getElementById('f-driver').value) || 0;
   document.getElementById('bigcar-display').textContent = bigCar;
-  document.getElementById('return-count-display').value = lay + monk + bigCar + lateArr;
   document.getElementById('late-arrival-display').textContent = lateArr;
 }
 
@@ -379,7 +376,7 @@ async function doSubmit() {
   const driver      = parseInt(document.getElementById('f-driver').value)       || 0;
   const bigCar      = parseInt(document.getElementById('f-bigcar').value)       || 0;
   const lateArrival = parseInt(document.getElementById('f-late-arrival').value) || 0;
-  const returnCount = parseInt(document.getElementById('return-count-display').value) || 0;
+  const returnCount = parseInt(document.getElementById('f-return-count').value) || 0;
   const note        = document.getElementById('f-note').value;
 
   if ((lay + monk + volunteer + driver + bigCar + lateArrival) === 0 && !confirm('總人數為 0，確定要送出嗎？')) return;
