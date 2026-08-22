@@ -123,10 +123,16 @@ tr.total-row td { background:#f0ede8; font-weight:700; border-top:2px solid var(
 
     <!-- 詳細數據（預設隱藏） -->
     <div id="detail-section" style="display:none;margin-top:14px;">
-      <div style="margin-bottom:8px;display:flex;align-items:center;gap:10px;">
+      <div style="margin-bottom:8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+        <div style="display:flex;gap:4px;background:#f4f6f9;border-radius:8px;padding:3px;">
+          <button id="filter-all"        onclick="setCompFilter('all')"        style="padding:5px 13px;font-size:13px;font-weight:600;border:none;border-radius:6px;cursor:pointer;background:var(--navy);color:white;">全部</button>
+          <button id="filter-reported"   onclick="setCompFilter('reported')"   style="padding:5px 13px;font-size:13px;font-weight:600;border:none;border-radius:6px;cursor:pointer;background:transparent;color:var(--muted);">已回報</button>
+          <button id="filter-unreported" onclick="setCompFilter('unreported')" style="padding:5px 13px;font-size:13px;font-weight:600;border:none;border-radius:6px;cursor:pointer;background:transparent;color:var(--muted);">未回報</button>
+        </div>
+        <div style="flex:1;"></div>
         <input id="comp-search" type="text" placeholder="🔍 搜尋精舍名稱或代碼…"
-          style="padding:7px 12px;border:1px solid #ccc;border-radius:8px;font-size:14px;width:100%;max-width:320px;"
-          oninput="compSearch=this.value;renderComparison(dashCache?.compRows||[])">
+          style="padding:7px 12px;border:1px solid #ccc;border-radius:8px;font-size:14px;width:220px;"
+          oninput="compSearch=this.value;renderComparison()">
         <button onclick="lockDetail()"
           style="padding:6px 12px;background:#f0ede8;color:var(--navy);border:1px solid #ccc;border-radius:8px;font-size:13px;cursor:pointer;white-space:nowrap;">
           🔒 重新鎖定
@@ -134,7 +140,7 @@ tr.total-row td { background:#f0ede8; font-weight:700; border-top:2px solid var(
       </div>
       <div class="table-wrap">
         <table id="comp-table">
-          <thead>
+          <thead id="comp-thead">
             <tr>
               <th rowspan="2" style="vertical-align:middle;">精舍</th>
               <th colspan="4" style="text-align:center;background:#2a4a7a;">── 報名人數 ──</th>
@@ -184,6 +190,7 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 let currentTab = 'comparison';
 let dashCache  = null;
 let compSearch = '';
+let compFilter = 'all';
 const DETAIL_PASSWORD = 'ctcm2026';
 
 function unlockDetail() {
@@ -197,6 +204,17 @@ function unlockDetail() {
   document.getElementById('detail-section').style.display = 'block';
   document.getElementById('detail-pw-err').textContent = '';
   if (dashCache) renderComparison();
+}
+
+function setCompFilter(f) {
+  compFilter = f;
+  ['all','reported','unreported'].forEach(k => {
+    const btn = document.getElementById('filter-'+k);
+    if (!btn) return;
+    btn.style.background = k === f ? 'var(--navy)' : 'transparent';
+    btn.style.color      = k === f ? 'white'       : 'var(--muted)';
+  });
+  renderComparison();
 }
 
 function lockDetail() {
@@ -465,6 +483,8 @@ function renderComparison() {
   const totRPpl    = totRLay + totRMonk + totRVol;
   const totRate    = totEPpl > 0 ? Math.round(totRPpl / totEPpl * 100) + '%' : '—';
   let sorted = [...rows].sort((a,b) => a.number.localeCompare(b.number));
+  if (compFilter === 'reported')   sorted = sorted.filter(r => r.reported);
+  if (compFilter === 'unreported') sorted = sorted.filter(r => !r.reported);
   if (compSearch.trim()) {
     const q = compSearch.trim().toLowerCase();
     sorted = sorted.filter(r => r.name.toLowerCase().includes(q) || r.number.toLowerCase().includes(q));
@@ -474,6 +494,25 @@ function renderComparison() {
   if (late) { lateEl.style.display = 'flex'; document.getElementById('late-summary-num').textContent = totLateArr; }
   else { lateEl.style.display = 'none'; }
 
+  // 動態更新表頭（加入下午晚到欄）
+  document.getElementById('comp-thead').innerHTML = `
+    <tr>
+      <th rowspan="2" style="vertical-align:middle;">精舍</th>
+      <th colspan="4" style="text-align:center;background:#2a4a7a;">── 報名人數 ──</th>
+      <th colspan="4" style="text-align:center;background:#1a6030;">── 實到人數 ──</th>
+      <th rowspan="2" style="vertical-align:middle;text-align:center;">落差</th>
+      <th rowspan="2" style="vertical-align:middle;text-align:center;">報到率</th>
+      <th rowspan="2" style="vertical-align:middle;text-align:center;">預設座位數</th>
+      <th rowspan="2" style="vertical-align:middle;text-align:center;">便當數</th>
+      <th rowspan="2" style="vertical-align:middle;text-align:center;">回點數</th>
+      ${late ? '<th rowspan="2" style="vertical-align:middle;text-align:center;">下午<br>晚到</th>' : ''}
+    </tr>
+    <tr>
+      <th>參加法會</th><th>法師</th><th>義工</th><th>小計</th>
+      <th>參加法會</th><th>法師</th><th>義工</th><th>小計</th>
+    </tr>`;
+
+  const colspan = late ? 15 : 14;
   document.getElementById('comp-detail-body').innerHTML =
     sorted.map(r => `<tr${!r.reported?' class="unreported"':''}>
       <td><span style="color:var(--muted);font-size:12px;margin-right:4px;">${r.number}</span>${r.name}${!r.reported ? ' <span class="badge badge-wait" style="font-size:10px;">未回報</span>' : ''}</td>
@@ -490,7 +529,9 @@ function renderComparison() {
       <td style="text-align:center;">${r.seatCount}</td>
       <td style="text-align:center;">${r.reported ? r.driver : '—'}</td>
       <td style="text-align:center;">${r.reported ? r.returnCount : '—'}</td>
+      ${late ? `<td style="text-align:center;">${r.reported ? (r.lateArrival||0) : '—'}</td>` : ''}
     </tr>`).join('') +
+    (sorted.length === 0 ? `<tr><td colspan="${colspan}" class="empty-msg">無符合條件的精舍</td></tr>` : '') +
     `<tr style="background:#f0ede8;font-weight:700;border-top:2px solid var(--navy);">
       <td>合計（已回報 ${repRows.length}／${rows.length} 間）</td>
       <td style="text-align:center;">${totELay}</td><td style="text-align:center;">${totEMonk}</td><td style="text-align:center;">${totEVol}</td><td style="text-align:center;font-weight:700;">${totELay+totEMonk+totEVol}</td>
@@ -500,6 +541,7 @@ function renderComparison() {
       <td style="text-align:center;">${totSeat}</td>
       <td style="text-align:center;">${totDriver}</td>
       <td style="text-align:center;">${totReturnCount}</td>
+      ${late ? `<td style="text-align:center;">${totLateArr}</td>` : ''}
     </tr>`;
 }
 
