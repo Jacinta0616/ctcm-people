@@ -154,7 +154,7 @@ header p  { font-size:13px; opacity:.75; margin-top:2px; }
         </div>
         <div class="inp-group">
           <label>回點數</label>
-          <input type="number" id="f-return-count" min="0" value="0">
+          <input type="number" id="f-return-count" min="0" value="0" oninput="calcTotal()">
         </div>
       </div>
       <div id="late-input-row" style="margin:0 0 10px;display:none;">
@@ -171,14 +171,18 @@ header p  { font-size:13px; opacity:.75; margin-top:2px; }
         <span>合計人數（信眾＋法師＋義工）</span>
         <span class="total-num" id="total-num">0</span>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;margin-top:10px;padding-top:10px;border-top:1px dashed #ddd;text-align:center;">
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;margin-top:10px;padding-top:10px;border-top:1px dashed #ddd;text-align:center;">
         <div style="padding:8px 4px;border-right:1px dashed #ddd;">
           <div style="font-size:12px;color:var(--muted);margin-bottom:6px;">便當數</div>
           <div style="font-size:26px;font-weight:800;color:var(--muted);" id="driver-display">0</div>
         </div>
-        <div style="padding:8px 4px;">
+        <div style="padding:8px 4px;border-right:1px dashed #ddd;">
           <div style="font-size:12px;color:var(--muted);margin-bottom:6px;">大車數</div>
           <div style="font-size:26px;font-weight:800;color:var(--muted);" id="bigcar-display">0</div>
+        </div>
+        <div style="padding:8px 4px;">
+          <div style="font-size:12px;color:var(--muted);margin-bottom:6px;">回點數</div>
+          <div style="font-size:26px;font-weight:800;color:var(--navy);" id="return-count-display">0</div>
         </div>
       </div>
       <div id="late-display-row" style="margin-top:6px;padding-top:8px;border-top:1px dashed #ddd;text-align:center;display:none;">
@@ -365,6 +369,7 @@ function calcTotal() {
   document.getElementById('total-num').textContent      = lay + monk + vol;
   document.getElementById('driver-display').textContent = parseInt(document.getElementById('f-driver').value) || 0;
   document.getElementById('bigcar-display').textContent = bigCar;
+  document.getElementById('return-count-display').textContent = parseInt(document.getElementById('f-return-count').value) || 0;
   document.getElementById('late-arrival-display').textContent = lateArr;
 }
 
